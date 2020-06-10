@@ -10,3 +10,7 @@ publish = false
 [dependencies]
 niffler = "2.0.0"
 oxo = { path = "oxo" }
+
+[dev-dependencies]
+predicates = "1.0.4"
+assert_cmd = "1.0.1"
