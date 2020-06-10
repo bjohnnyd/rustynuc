@@ -8,7 +8,8 @@ publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-niffler = "2.0.0"
+niffler = "2.1.0"
+structopt = "0.3.14"
 oxo = { path = "oxo" }
 
 [dev-dependencies]
