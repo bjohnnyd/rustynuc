@@ -1,30 +1,14 @@
-use std::collections::HashMap;
+#![warn(missing_debug_implementations, rust_2018_idioms, missing_docs)]
+#![allow(dead_code, unused_variables)]
 
-pub struct SuffixTrie<'a>{
-    pub text: String,
-    pub suffix_trie: HashMap<char, &'a str>,
-}
+//! QC tool for assesment of likelihood of oxo-G related variation in reads.
+//! Currently not applicable for multigenomic experiments due to assumptions made.
 
-impl SuffixTrie<'_> {
-    fn new(s: &str) -> Self {
-        s.
+mod cli;
 
-    }
-
-}
-
-/*
- append '$' to t
-set a hashmap to store a char --> remainder slice mapping
-for i in length of t
-curent dictionary = the hashmap
-for character in t[i]
-if character not in dictionary
-add an empty vec
-otherwise
-set current_dictionary = current_dictionary[c]
-*/
+use structopt::StructOpt;
 
 fn main() {
-    println!("Hello, world!");
+    let opt = cli::Opt::from_args();
+    println!("{:?}", opt);
 }
