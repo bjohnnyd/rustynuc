@@ -7,6 +7,9 @@ publish = false
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[workspace]
+members = ["oxo"]
+
 [dependencies]
 niffler = "2.1.0"
 structopt = "0.3.14"
