@@ -1,33 +1,47 @@
 use bio::alphabets::dna;
 use bio::data_structures::bwt::{bwt, less, Less, Occ, BWT};
-use bio::data_structures::fmindex::{FMIndex, FMIndexable};
-use bio::data_structures::suffix_array::suffix_array;
+use bio::data_structures::fmindex::{FMDIndex, FMIndex, FMIndexable};
+use bio::data_structures::suffix_array::{suffix_array, RawSuffixArray};
 
 // TODO: Maybe better us FMDIndex and concatenate fmindex for forward and reverse as
 // https://docs.rs/bio/0.31.0/src/bio/data_structures/fmindex.rs.html#417
 pub struct Reference {
-    pub(crate) forward: FMIndex<BWT, Less, Occ>,
-    pub(crate) reverse: FMIndex<BWT, Less, Occ>,
+    pub(crate) fmindex: FMIndex<BWT, Less, Occ>,
+    pub(crate) sa: RawSuffixArray,
+    pub(crate) seq: Vec<u8>,
+    pub(crate) ref_len: usize,
 }
 
 impl Reference {
     pub fn new<T: AsRef<str>>(text: T) -> Self {
-        let mut complement = dna::revcomp(text.as_ref().as_bytes());
-        complement.push(b'$');
-        let text = format!("{}$", text.as_ref());
-        let forward = Self::create_fm_index(text.as_bytes());
-        let reverse = Self::create_fm_index(&complement);
+        let text = text.as_ref().as_bytes();
+        let ref_len = text.len();
+        let revcomp = dna::revcomp(text);
+        let text_builder: Vec<&[u8]> = vec![text, b"$", &revcomp, b"$"];
+        let text = text_builder.concat();
 
-        Self { forward, reverse }
-    }
-
-    fn create_fm_index(text: &[u8]) -> FMIndex<BWT, Less, Occ> {
         let alphabet = dna::n_alphabet();
-        let sa = suffix_array(text);
-        let bwt = bwt(text, &sa);
+        let sa = suffix_array(&text);
+        let bwt = bwt(&text, &sa);
         let less = less(&bwt, &alphabet);
         let occ = Occ::new(&bwt, 3, &alphabet);
-        FMIndex::new(bwt, less, occ)
+
+        let fmindex = FMIndex::new(bwt, less, occ);
+
+        Self {
+            fmindex,
+            sa,
+            seq: text,
+            ref_len,
+        }
+    }
+}
+
+impl Reference {
+    pub fn search_pattern(&self, pattern: &[u8]) -> (Vec<usize>, Vec<usize>) {
+        let sai = self.fmindex.backward_search(pattern.iter());
+        let positions = sai.occ(&self.sa);
+        positions.iter().partition(|pos| **pos < self.ref_len)
     }
 }
 
@@ -39,19 +53,22 @@ mod tests {
     #[test]
     fn test_ref_creation() {
         let text = "GCCTTAACATTATTACGCCTA";
-        let texts = "GCCTTAACATTATTACGCCTA$";
-        let pattern = "TTT";
         let reference = Reference::new(&text);
 
-        let mut revcomp = dna::revcomp(text.as_bytes());
-        revcomp.push(b'$');
-        let sa = suffix_array(texts.as_bytes());
-        let suffix_indices = reference.forward.backward_search(pattern.as_bytes().iter());
-        dbg!(&suffix_indices);
-        let pos = suffix_indices.occ(&sa);
-        println!(
-            "Reference '{}' has pattern '{}' occuring at '{:?}'",
-            &text, &pattern, pos
-        );
+        let pattern = b"GGC";
+
+        let (fwd_matches, rev_matches) = reference.search_pattern(pattern);
+
+        if !fwd_matches.is_empty() {
+            println!("Found some matches of forward {:?}", fwd_matches);
+        } else {
+            println!("No matches on forward reference");
+        }
+
+        if !rev_matches.is_empty() {
+            println!("Found some matches on reverse {:?}", rev_matches);
+        } else {
+            println!("No matches on reverse reference");
+        }
     }
 }

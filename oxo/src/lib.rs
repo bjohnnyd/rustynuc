@@ -7,7 +7,7 @@
 //! specific sequnce contexts as `CCG -> CAG`.
 //!
 
-mod motif_counts;
+mod kmer;
 mod reference;
 
 const DEFAULT_KMER_SIZE: usize = 21;
