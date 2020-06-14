@@ -1,4 +1,3 @@
-use bio::alphabets::dna;
 use bio::io::fastq;
 use std::collections::HashMap;
 

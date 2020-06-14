@@ -8,6 +8,7 @@
 //!
 
 mod motif_counts;
+mod reference;
 
 const DEFAULT_KMER_SIZE: usize = 21;
 
