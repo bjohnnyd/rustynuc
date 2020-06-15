@@ -10,7 +10,7 @@ use bio::io::fastq;
 // Need to index the reads for this to work!!
 
 #[derive(Debug)]
-pub(crate) struct KmerRead<'a> {
+pub(crate) struct OxoKmerRead<'a> {
     read: &'a fastq::Record,
     kmer_size: usize,
     kmers: HashMapFx<&'a [u8], Vec<u32>>,
@@ -23,9 +23,17 @@ pub enum Orientation {
     REV,
 }
 
-impl<'a> KmerRead<'a> {
+impl<'a> OxoKmerRead<'a> {
     fn new(read: &'a fastq::Record, kmer_size: usize, read_type: Orientation) -> Self {
-        let kmers = hash_kmers(read.seq(), kmer_size);
+        let oxo_nuc = match read_type {
+            Orientation::FWD => b'G',
+            Orientation::REV => b'C',
+        };
+
+        let kmers = hash_kmers(read.seq(), kmer_size)
+            .into_iter()
+            .filter(|(kmer, _)| kmer.contains(&oxo_nuc))
+            .collect();
 
         Self {
             read,
@@ -119,7 +127,7 @@ mod tests {
         let qual = vec![19, 22, 15, 20, 19, 22, 15, 20];
         let fastq = fastq::Record::with_attrs("test_read", None, seq, &qual);
 
-        let kmer_read = KmerRead::new(&fastq, 3, Orientation::FWD);
+        let kmer_read = OxoKmerRead::new(&fastq, 3, Orientation::FWD);
 
         let expected_first_kmer = b"GCA";
         assert_eq!(
