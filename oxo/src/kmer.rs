@@ -1,5 +1,5 @@
+use bio::alignment::sparse::{hash_kmers, HashMapFx};
 use bio::io::fastq;
-use std::collections::HashMap;
 
 // Basic idea could be that take kmers across fwd reads and filter for ones containing `G` in
 // forward reads and ones containing `C` in reverse reads. On forward reads there should be
@@ -13,7 +13,7 @@ use std::collections::HashMap;
 pub(crate) struct KmerRead<'a> {
     read: &'a fastq::Record,
     kmer_size: usize,
-    motif_counts: HashMap<String, usize>,
+    kmers: HashMapFx<&'a [u8], Vec<u32>>,
     read_type: Orientation,
 }
 
@@ -25,25 +25,12 @@ pub enum Orientation {
 
 impl<'a> KmerRead<'a> {
     fn new(read: &'a fastq::Record, kmer_size: usize, read_type: Orientation) -> Self {
-        let motif_counts = read
-            .seq()
-            .chunks(kmer_size)
-            .filter(|chunk| {
-                chunk.iter().any(|c| *c == b'G' || *c == b'T')
-                    && chunk.len() == kmer_size
-                    && !chunk.iter().all(|c| *c == b'G')
-            })
-            .fold(HashMap::new(), |mut motif_counts, chunk| {
-                let motif = String::from_utf8(chunk.to_vec()).unwrap();
-                let count = motif_counts.entry(motif).or_default();
-                *count += 1;
-                motif_counts
-            });
+        let kmers = hash_kmers(read.seq(), kmer_size);
 
         Self {
             read,
             kmer_size,
-            motif_counts,
+            kmers,
             read_type,
         }
     }
@@ -124,5 +111,20 @@ mod tests {
 
         assert_eq!(fwd_oxo.read_diffs.iter().max(), Some(&3usize));
         assert_eq!(rev_oxo.read_diffs.iter().max(), Some(&1usize));
+    }
+
+    #[test]
+    fn test_kmers() {
+        let seq = b"GCATGGFG";
+        let qual = vec![19, 22, 15, 20, 19, 22, 15, 20];
+        let fastq = fastq::Record::with_attrs("test_read", None, seq, &qual);
+
+        let kmer_read = KmerRead::new(&fastq, 3, Orientation::FWD);
+
+        let expected_first_kmer = "GCA";
+        assert_eq!(
+            kmer_read.kmers.get(expected_first_kmer.as_bytes()),
+            Some(&vec![0])
+        );
     }
 }
