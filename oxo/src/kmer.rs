@@ -121,9 +121,9 @@ mod tests {
 
         let kmer_read = KmerRead::new(&fastq, 3, Orientation::FWD);
 
-        let expected_first_kmer = "GCA";
+        let expected_first_kmer = b"GCA";
         assert_eq!(
-            kmer_read.kmers.get(expected_first_kmer.as_bytes()),
+            kmer_read.kmers.get(&expected_first_kmer[..]),
             Some(&vec![0])
         );
     }
