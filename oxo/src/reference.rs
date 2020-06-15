@@ -1,6 +1,6 @@
 use bio::alphabets::dna;
 use bio::data_structures::bwt::{bwt, less, Less, Occ, BWT};
-use bio::data_structures::fmindex::{FMDIndex, FMIndex, FMIndexable};
+use bio::data_structures::fmindex::{FMIndex, FMIndexable};
 use bio::data_structures::suffix_array::{suffix_array, RawSuffixArray};
 
 // TODO: Maybe better us FMDIndex and concatenate fmindex for forward and reverse as
@@ -57,18 +57,11 @@ mod tests {
 
         let pattern = b"GGC";
 
-        let (fwd_matches, rev_matches) = reference.search_pattern(pattern);
+        let (fwd_matches, mut rev_matches) = reference.search_pattern(pattern);
 
-        if !fwd_matches.is_empty() {
-            println!("Found some matches of forward {:?}", fwd_matches);
-        } else {
-            println!("No matches on forward reference");
-        }
+        rev_matches.remove(0);
 
-        if !rev_matches.is_empty() {
-            println!("Found some matches on reverse {:?}", rev_matches);
-        } else {
-            println!("No matches on reverse reference");
-        }
+        assert!(fwd_matches.is_empty());
+        assert_eq!(rev_matches.len(), 1);
     }
 }

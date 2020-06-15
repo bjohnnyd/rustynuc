@@ -49,39 +49,61 @@ impl<'a> KmerRead<'a> {
     }
 }
 
-// TODO: Still returns original could change by:
-// 1. Passing an additional variable original_text
-// 2. Wrapping in another function that will filter out original
-// 3. Filter from result
-// NOTE: Might be best to create struct for this so I can also keep track of original kmer
-// as might be needed to get diff to original in order to create the expected variant on reverse
-// complement too if this one is
-/// "Oxidizes" the specified string depending on orientation.
-/// FWD produces all combinations of G --> C mutations
-/// while REV produces all C-->T mutations for an input kmer
-pub fn oxidize<T: AsRef<str>>(text: T, orientation: &Orientation) -> Vec<String> {
-    let text = text.as_ref();
-    let (ref_oxo_nuc, alt_oxo_nuc) = match orientation {
-        Orientation::FWD => ('G', 'T'),
-        _ => ('C', 'A'),
-    };
+pub struct OxidizedReads {
+    original_read: String,
+    oxidized_reads: Vec<String>,
+    read_diffs: Vec<usize>,
+}
 
-    if let Some(i) = text.find(ref_oxo_nuc) {
-        let prefix = &text[0..i];
-        let suffix = &text[(i + 1)..];
+impl OxidizedReads {
+    pub fn new<T: AsRef<str>>(text: T, orientation: Orientation) -> Self {
+        let mut oxidized_reads = Self::oxidize(text, &orientation);
+        let original_read = oxidized_reads.remove(0);
+        let read_diffs = oxidized_reads
+            .iter()
+            .map(|oxo_read| {
+                oxo_read
+                    .chars()
+                    .zip(original_read.chars())
+                    .filter(|(oxo_nuc, orig_nuc)| oxo_nuc != orig_nuc)
+                    .count()
+            })
+            .collect();
 
-        let comb = oxidize(&suffix, &orientation);
-        let mods = vec![ref_oxo_nuc, alt_oxo_nuc];
-        return mods.iter().fold(Vec::new(), |mut oxidized_set, nuc| {
-            for suffix_result in &comb {
-                let seq = format!("{}{}{}", &prefix, nuc, &suffix_result);
-                oxidized_set.push(seq);
-            }
-            oxidized_set
-        });
+        Self {
+            original_read,
+            oxidized_reads,
+            read_diffs,
+        }
     }
 
-    return vec![text.to_string()];
+    /// "Oxidizes" the specified string depending on orientation.
+    /// FWD produces all combinations of G --> C mutations
+    /// while REV produces all C-->T mutations for an input kmer
+    fn oxidize<T: AsRef<str>>(text: T, orientation: &Orientation) -> Vec<String> {
+        let text = text.as_ref();
+        let (ref_oxo_nuc, alt_oxo_nuc) = match orientation {
+            Orientation::FWD => ('G', 'T'),
+            _ => ('C', 'A'),
+        };
+
+        if let Some(i) = text.find(ref_oxo_nuc) {
+            let prefix = &text[0..i];
+            let suffix = &text[(i + 1)..];
+
+            let comb = OxidizedReads::oxidize(&suffix, &orientation);
+            let mods = vec![ref_oxo_nuc, alt_oxo_nuc];
+            return mods.iter().fold(Vec::new(), |mut oxidized_set, nuc| {
+                for suffix_result in &comb {
+                    let seq = format!("{}{}{}", &prefix, nuc, &suffix_result);
+                    oxidized_set.push(seq);
+                }
+                oxidized_set
+            });
+        }
+
+        return vec![text.to_string()];
+    }
 }
 
 #[cfg(test)]
@@ -90,26 +112,17 @@ mod tests {
 
     #[test]
     fn test_oxidize() {
-        let orientation = Orientation::FWD;
         let kmer = "GCATTGAGTT";
 
-        let mut fwd_oxo = oxidize(kmer, &Orientation::FWD);
-        let mut rev_oxo = oxidize(kmer, &Orientation::REV);
+        let fwd_oxo = OxidizedReads::new(kmer, Orientation::FWD);
+        let rev_oxo = OxidizedReads::new(kmer, Orientation::REV);
 
-        fwd_oxo.remove(0);
-        rev_oxo.remove(0);
+        assert_eq!(fwd_oxo.original_read, rev_oxo.original_read);
 
-        println!(
-            "For Kmer '{}' forward oxidized versions are {:?}",
-            kmer, &fwd_oxo
-        );
+        assert_eq!(fwd_oxo.oxidized_reads.len(), 7);
+        assert_eq!(rev_oxo.oxidized_reads.len(), 1);
 
-        println!(
-            "For Kmer '{}' reverse oxidized versions are {:?}",
-            kmer, &rev_oxo
-        );
-
-        assert_eq!(fwd_oxo.len(), 7);
-        assert_eq!(rev_oxo.len(), 1);
+        assert_eq!(fwd_oxo.read_diffs.iter().max(), Some(&3usize));
+        assert_eq!(rev_oxo.read_diffs.iter().max(), Some(&1usize));
     }
 }
