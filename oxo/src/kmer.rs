@@ -127,7 +127,7 @@ mod tests {
         let qual = vec![19, 22, 15, 20, 19, 22, 15, 20];
         let fastq = fastq::Record::with_attrs("test_read", None, seq, &qual);
 
-        let kmer_read = OxoKmerRead::new(&fastq, 3, Orientation::FWD);
+        let kmer_read = OxoKmerRead::new(&fastq, 4, Orientation::FWD);
 
         let expected_first_kmer = b"GCA";
         assert_eq!(
