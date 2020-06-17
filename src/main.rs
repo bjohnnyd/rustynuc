@@ -9,6 +9,6 @@ mod cli;
 use structopt::StructOpt;
 
 fn main() {
-    let opt = cli::Opt::from_args();
+    let opt = cli::RustyNuc::from_args();
     println!("{:?}", opt);
 }
