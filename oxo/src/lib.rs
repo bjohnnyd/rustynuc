@@ -10,7 +10,8 @@
 mod kmer;
 mod reference;
 
-pub(crate) const DEFAULT_KMER_SIZE: usize = 21;
+pub(crate) const DEFAULT_KMER_SIZE: usize = 5;
+pub(crate) const DEFAULT_KMER_MIN: u32 = 10_000;
 pub(crate) const DEFAULT_SAMPLING_RATE_OCC: u32 = 3;
 
 //TODO: To many combinations to produce even with 10mers

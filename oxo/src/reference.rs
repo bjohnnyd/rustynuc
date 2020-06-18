@@ -4,6 +4,7 @@ use bio::alphabets::dna;
 use bio::data_structures::bwt::{bwt, less, Less, Occ, BWT};
 use bio::data_structures::fmindex::{FMIndex, FMIndexable};
 use bio::data_structures::suffix_array::{suffix_array, RawSuffixArray};
+use bio::io::fasta;
 use std::collections::HashMap;
 
 // TODO: Maybe better us FMDIndex and concatenate fmindex for forward and reverse as
@@ -46,22 +47,6 @@ impl<'a> Reference<'a> {
         let sai = self.fmindex.backward_search(pattern.iter());
         let positions = sai.occ(&self.sa);
         positions.iter().partition(|pos| **pos < self.ref_len)
-    }
-
-    pub fn hash_kmers(&self, kmer_size: usize) -> HashMap<&[u8], usize> {
-        let mut hashes = hash_kmers(self.seq, kmer_size)
-            .into_iter()
-            .map(|(seq, pos)| (seq, pos.len()))
-            .collect::<HashMap<&[u8], usize>>();
-
-        hash_kmers(&self.revcomp[..], kmer_size)
-            .into_iter()
-            .for_each(|(seq, pos)| {
-                let count = hashes.entry(seq).or_insert(0);
-                *count += pos.len();
-            });
-
-        hashes
     }
 }
 
@@ -122,6 +107,37 @@ impl OxidizedReads {
         return vec![text.to_string()];
     }
 }
+
+/// Creates unique kmers occuring in the first and second strand of seqs
+/// that contain nucleotides that can be affected by oxo damage `C` and `G`
+pub fn create_singletons(seq: &[u8], kmer_size: usize) -> Vec<&[u8]> {
+    hash_kmers_with_counts(seq, kmer_size)
+        .into_iter()
+        .filter(|(seq, occurences)| {
+            (seq.iter().any(|c| *c == b'C' || *c == b'G')) && *occurences == 1usize
+        })
+        .map(|(seq, occurences)| seq)
+        .collect()
+}
+
+// TODO: This wont work with revcomp
+/// Creates the hash and counts for both strands of input sequence
+pub fn hash_kmers_with_counts(seq: &[u8], kmer_size: usize) -> HashMap<&[u8], usize> {
+    let revcomp = dna::revcomp(seq.to_vec());
+    let mut hashes = hash_kmers(seq, kmer_size)
+        .into_iter()
+        .map(|(seq, pos)| (seq, pos.len()))
+        .collect::<HashMap<&[u8], usize>>();
+
+    hash_kmers(&revcomp[..], kmer_size)
+        .into_iter()
+        .for_each(|(seq, pos)| {
+            let count = hashes.entry(seq).or_insert(0);
+            *count += pos.len();
+        });
+
+    hashes
+}
 #[cfg(test)]
 mod tests {
 
@@ -149,27 +165,38 @@ mod tests {
         let (rdr, _) = niffler::from_path("tests/refs/ref.fa.gz").unwrap();
         let reference = bio::io::fasta::Reader::new(rdr);
 
-        for record in reference.records() {
-            let record = record.unwrap();
-            let record_reference = Reference::new(record.seq());
-            let (fwd_matches, rev_matches) = record_reference.search_pattern(pattern);
+        let records = reference
+            .records()
+            .into_iter()
+            .filter_map(Result::ok)
+            .collect::<Vec<fasta::Record>>();
 
-            assert_eq!(fwd_matches.len(), 2);
-            assert_eq!(rev_matches.len(), 1);
+        let seqs = records
+            .iter()
+            .map(|record| record.seq())
+            .collect::<Vec<&[u8]>>()
+            .concat();
 
-            // NOTE: Need to check that the kmer occurs only once in reference
-            // to ensure that the closest oxo sequence is most likely source from this kmer
-            for (seq, occurence) in
-                record_reference
-                    .hash_kmers(8)
-                    .iter()
-                    .filter(|(seq, occurences)| {
-                        (seq.iter().any(|c| *c == b'C' || *c == b'G')) && **occurences == 1usize
-                    })
-            {
-                let seq = unsafe { String::from_utf8_unchecked(seq.to_vec()) };
+        #[allow(unused)]
+        let mut singletons = Vec::new();
 
-                println!("Kmer: '{}' occurs {} times.", seq, occurence)
+        // TODO: this will not work need to create a single reference object for the fasta
+        // do i even need the struct, all i need is the singletons with certain n from the fasta
+        // probably need to iter over fasta and have fm index of first$first_rev$second$second_rev
+        for k in crate::DEFAULT_KMER_SIZE..21 {
+            let record_reference = Reference::new(&seqs[..]);
+            let raw_singletons = create_singletons(&seqs[..], k);
+            println!(
+                "With kmer size {} found {} singletons",
+                k,
+                raw_singletons.len()
+            );
+            if raw_singletons.len() as u32 > crate::DEFAULT_KMER_MIN {
+                singletons = raw_singletons
+                    .into_iter()
+                    .map(|raw_seq| unsafe { String::from_utf8_unchecked(raw_seq.to_vec()) })
+                    .collect();
+                break;
             }
         }
     }
