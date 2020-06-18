@@ -1,48 +1,67 @@
 use crate::kmer::Orientation;
+use bio::alignment::sparse::{hash_kmers, HashMapFx};
 use bio::alphabets::dna;
 use bio::data_structures::bwt::{bwt, less, Less, Occ, BWT};
 use bio::data_structures::fmindex::{FMIndex, FMIndexable};
 use bio::data_structures::suffix_array::{suffix_array, RawSuffixArray};
+use std::collections::HashMap;
 
 // TODO: Maybe better us FMDIndex and concatenate fmindex for forward and reverse as
 // https://docs.rs/bio/0.31.0/src/bio/data_structures/fmindex.rs.html#417
-pub struct Reference {
+pub struct Reference<'a> {
     pub(crate) fmindex: FMIndex<BWT, Less, Occ>,
     pub(crate) sa: RawSuffixArray,
-    pub(crate) seq: Vec<u8>,
+    pub(crate) seq: &'a [u8],
+    pub(crate) revcomp: Vec<u8>,
     pub(crate) ref_len: usize,
 }
 
-impl Reference {
-    pub fn new<T: AsRef<str>>(text: T) -> Self {
-        let text = text.as_ref().as_bytes();
-        let ref_len = text.len();
-        let revcomp = dna::revcomp(text);
-        let text_builder: Vec<&[u8]> = vec![text, b"$", &revcomp, b"$"];
+// TODO: in order to hash reverse comp need to create it might be better to own the key in hash
+// then in some cases
+impl<'a> Reference<'a> {
+    pub fn new(seq: &'a [u8]) -> Self {
+        let ref_len = seq.len();
+        let revcomp = dna::revcomp(seq);
+        let text_builder: Vec<&[u8]> = vec![seq, b"$", &revcomp, b"$"];
         let text = text_builder.concat();
 
         let alphabet = dna::n_alphabet();
         let sa = suffix_array(&text);
         let bwt = bwt(&text, &sa);
         let less = less(&bwt, &alphabet);
-        let occ = Occ::new(&bwt, 3, &alphabet);
+        let occ = Occ::new(&bwt, crate::DEFAULT_SAMPLING_RATE_OCC, &alphabet);
 
         let fmindex = FMIndex::new(bwt, less, occ);
 
         Self {
             fmindex,
             sa,
-            seq: text,
+            seq,
+            revcomp,
             ref_len,
         }
     }
-}
 
-impl Reference {
     pub fn search_pattern(&self, pattern: &[u8]) -> (Vec<usize>, Vec<usize>) {
         let sai = self.fmindex.backward_search(pattern.iter());
         let positions = sai.occ(&self.sa);
         positions.iter().partition(|pos| **pos < self.ref_len)
+    }
+
+    pub fn hash_kmers(&self, kmer_size: usize) -> HashMap<&[u8], usize> {
+        let mut hashes = hash_kmers(self.seq, kmer_size)
+            .into_iter()
+            .map(|(seq, pos)| (seq, pos.len()))
+            .collect::<HashMap<&[u8], usize>>();
+
+        hash_kmers(&self.revcomp[..], kmer_size)
+            .into_iter()
+            .for_each(|(seq, pos)| {
+                let count = hashes.entry(seq).or_insert(0);
+                *count += pos.len();
+            });
+
+        hashes
     }
 }
 
@@ -110,8 +129,8 @@ mod tests {
 
     #[test]
     fn test_ref_creation() {
-        let text = "GCCTTAACATTATTACGCCTA";
-        let reference = Reference::new(&text);
+        let text = b"GCCTTAACATTATTACGCCTA";
+        let reference = Reference::new(text);
 
         let pattern = b"GGC";
 
@@ -121,6 +140,38 @@ mod tests {
 
         assert!(fwd_matches.is_empty());
         assert_eq!(rev_matches.len(), 1);
+    }
+
+    #[test]
+    fn test_ref_real() {
+        let pattern = b"GCTAAGGT";
+
+        let (rdr, _) = niffler::from_path("tests/refs/ref.fa.gz").unwrap();
+        let reference = bio::io::fasta::Reader::new(rdr);
+
+        for record in reference.records() {
+            let record = record.unwrap();
+            let record_reference = Reference::new(record.seq());
+            let (fwd_matches, rev_matches) = record_reference.search_pattern(pattern);
+
+            assert_eq!(fwd_matches.len(), 2);
+            assert_eq!(rev_matches.len(), 1);
+
+            // NOTE: Need to check that the kmer occurs only once in reference
+            // to ensure that the closest oxo sequence is most likely source from this kmer
+            for (seq, occurence) in
+                record_reference
+                    .hash_kmers(8)
+                    .iter()
+                    .filter(|(seq, occurences)| {
+                        (seq.iter().any(|c| *c == b'C' || *c == b'G')) && **occurences == 1usize
+                    })
+            {
+                let seq = unsafe { String::from_utf8_unchecked(seq.to_vec()) };
+
+                println!("Kmer: '{}' occurs {} times.", seq, occurence)
+            }
+        }
     }
 
     #[test]
