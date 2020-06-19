@@ -1,6 +1,6 @@
 use crate::error::Error;
 use crate::kmer::Orientation;
-use bio::alignment::sparse::{hash_kmers, HashMapFx};
+use bio::alignment::sparse::hash_kmers;
 use bio::alphabets::dna;
 use bio::data_structures::bwt::{bwt, less, Less, Occ, BWT};
 use bio::data_structures::fmindex::{FMIndex, FMIndexable};
@@ -62,8 +62,14 @@ impl Reference {
         let fmindex = FMIndex::new(bwt, less, occ);
         (fmindex, sa)
     }
+
+    pub fn search_pattern(&self, pattern: &[u8]) -> Vec<usize> {
+        let sai = self.fmindex.backward_search(pattern.iter());
+        sai.occ(&self.sa)
+    }
 }
 
+#[derive(Debug)]
 pub struct OxidizedReads {
     original_read: String,
     oxidized_reads: Vec<String>,
@@ -71,13 +77,14 @@ pub struct OxidizedReads {
 }
 
 impl OxidizedReads {
-    pub fn new<T: AsRef<str>>(text: T, orientation: Orientation) -> Self {
+    pub fn new(text: &[u8], orientation: Orientation) -> Result<Self> {
         let (ref_oxo_nuc, alt_oxo_nuc) = match orientation {
-            Orientation::FWD => ('G', 'T'),
-            Orientation::REV => ('C', 'A'),
+            Orientation::FWD => (b'G', b'T'),
+            Orientation::REV => (b'C', b'A'),
         };
 
-        let mut oxidized_reads = Self::oxidize(text, ref_oxo_nuc, alt_oxo_nuc);
+        let mut oxidized_reads = Self::oxidize(text, ref_oxo_nuc, alt_oxo_nuc)?;
+        dbg!(&oxidized_reads);
         let original_read = oxidized_reads.remove(0);
         let read_diffs = oxidized_reads
             .iter()
@@ -90,67 +97,70 @@ impl OxidizedReads {
             })
             .collect();
 
-        Self {
+        Ok(Self {
             original_read,
             oxidized_reads,
             read_diffs,
-        }
+        })
     }
 
     /// "Oxidizes" the specified string depending on orientation.
     /// FWD produces all combinations of G --> C mutations
     /// while REV produces all C-->T mutations for an input kmer
-    fn oxidize<T: AsRef<str>>(text: T, ref_oxo_nuc: char, alt_oxo_nuc: char) -> Vec<String> {
-        let text = text.as_ref();
-
-        if let Some(i) = text.find(ref_oxo_nuc) {
+    fn oxidize(text: &[u8], ref_oxo_nuc: u8, alt_oxo_nuc: u8) -> Result<Vec<String>> {
+        let mut oxidized_set = Vec::new();
+        if let Some(i) = text.iter().position(|c| *c == ref_oxo_nuc) {
             let prefix = &text[0..i];
             let suffix = &text[(i + 1)..];
 
-            let comb = OxidizedReads::oxidize(&suffix, ref_oxo_nuc, alt_oxo_nuc);
+            let comb = OxidizedReads::oxidize(&suffix, ref_oxo_nuc, alt_oxo_nuc)?;
             let mods = vec![ref_oxo_nuc, alt_oxo_nuc];
-            return mods.iter().fold(Vec::new(), |mut oxidized_set, nuc| {
-                for suffix_result in &comb {
-                    let seq = format!("{}{}{}", &prefix, nuc, &suffix_result);
-                    oxidized_set.push(seq);
+            let mut oxidized_set = Vec::new();
+            for nuc in mods.iter() {
+                for suffix_result in comb.iter().map(|seq| seq.as_bytes()) {
+                    let nuc = vec![*nuc];
+                    let seq = vec![prefix, &nuc[..], suffix_result];
+                    oxidized_set.push(String::from_utf8(seq.concat())?);
                 }
-                oxidized_set
-            });
+            }
+            return Ok(oxidized_set);
+        } else {
+            oxidized_set.push(String::from_utf8(text.to_vec())?);
         }
 
-        return vec![text.to_string()];
+        Ok(oxidized_set)
     }
 }
 
 /// Creates unique kmers occuring in the first and second strand of seqs
 /// that contain nucleotides that can be affected by oxo damage `C` and `G`
-pub fn create_singletons(seq: &[u8], kmer_size: usize) -> Vec<&[u8]> {
-    hash_kmers_with_counts(seq, kmer_size)
+pub fn create_singletons(seq: &[u8], kmer_size: usize) -> Result<Vec<String>> {
+    Ok(hash_kmers_with_counts(seq, kmer_size)?
         .into_iter()
         .filter(|(seq, occurences)| {
-            (seq.iter().any(|c| *c == b'C' || *c == b'G')) && *occurences == 1usize
+            (seq.chars().any(|c| c == 'C' || c == 'G')) && *occurences == 1usize
         })
         .map(|(seq, occurences)| seq)
-        .collect()
+        .collect())
 }
 
-// TODO: This wont work with revcomp
 /// Creates the hash and counts for both strands of input sequence
-pub fn hash_kmers_with_counts(seq: &[u8], kmer_size: usize) -> HashMap<&[u8], usize> {
+pub fn hash_kmers_with_counts(seq: &[u8], kmer_size: usize) -> Result<HashMap<String, usize>> {
+    let mut hashes = HashMap::new();
     let revcomp = dna::revcomp(seq.to_vec());
-    let mut hashes = hash_kmers(seq, kmer_size)
-        .into_iter()
-        .map(|(seq, pos)| (seq, pos.len()))
-        .collect::<HashMap<&[u8], usize>>();
 
-    hash_kmers(&revcomp[..], kmer_size)
-        .into_iter()
-        .for_each(|(seq, pos)| {
-            let count = hashes.entry(seq).or_insert(0);
-            *count += pos.len();
-        });
+    for (kmer, pos) in hash_kmers(seq, kmer_size).into_iter() {
+        hashes.insert(String::from_utf8(seq.to_vec())?, pos.len());
+    }
 
-    hashes
+    for (rev_kmer, pos) in hash_kmers(&revcomp[..], kmer_size).into_iter() {
+        let count = hashes
+            .entry(String::from_utf8(rev_kmer.to_vec())?)
+            .or_insert(0);
+        *count += pos.len();
+    }
+
+    Ok(hashes)
 }
 
 #[cfg(test)]
@@ -158,20 +168,14 @@ mod tests {
 
     use super::*;
 
-    // #[test]
-    // fn test_ref_creation() {
-    // let text = b"GCCTTAACATTATTACGCCTA";
-    // let reference = Reference::new(text);
+    #[test]
+    fn test_ref_creation() {
+        let text = b"GCCTTAACATTATTACGCCTA";
+        let reference = Reference::new(text);
+        let pattern = b"GGC";
 
-    // let pattern = b"GGC";
-
-    // let (fwd_matches, mut rev_matches) = reference.search_pattern(pattern);
-
-    // rev_matches.remove(0);
-
-    // assert!(fwd_matches.is_empty());
-    // assert_eq!(rev_matches.len(), 1);
-    // }
+        assert_eq!(reference.search_pattern(pattern).len(), 2);
+    }
 
     #[test]
     fn test_ref_real() {
@@ -183,7 +187,7 @@ mod tests {
         let records = reference
             .records()
             .into_iter()
-            .flat_map(|record| record.is_ok())
+            .flat_map(|record| record.ok())
             .collect::<Vec<fasta::Record>>();
 
         let seqs = records
@@ -200,17 +204,14 @@ mod tests {
         // probably need to iter over fasta and have fm index of first$first_rev$second$second_rev
         for k in crate::DEFAULT_KMER_SIZE..21 {
             let record_reference = Reference::new(&seqs[..]);
-            let raw_singletons = create_singletons(&seqs[..], k);
+            let raw_singletons = create_singletons(&seqs[..], k).unwrap();
             println!(
                 "With kmer size {} found {} singletons",
                 k,
                 raw_singletons.len()
             );
             if raw_singletons.len() as u32 > crate::DEFAULT_KMER_MIN {
-                singletons = raw_singletons
-                    .into_iter()
-                    .map(|raw_seq| unsafe { String::from_utf8_unchecked(raw_seq.to_vec()) })
-                    .collect();
+                singletons = raw_singletons;
                 break;
             }
         }
@@ -218,10 +219,10 @@ mod tests {
 
     #[test]
     fn test_oxidize() {
-        let kmer = "GCATTGAGTT";
+        let kmer = b"GCATTGAGTT";
 
-        let fwd_oxo = OxidizedReads::new(kmer, Orientation::FWD);
-        let rev_oxo = OxidizedReads::new(kmer, Orientation::REV);
+        let fwd_oxo = OxidizedReads::new(kmer, Orientation::FWD).unwrap();
+        let rev_oxo = OxidizedReads::new(kmer, Orientation::REV).unwrap();
 
         assert_eq!(fwd_oxo.original_read, rev_oxo.original_read);
 
