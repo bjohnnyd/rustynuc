@@ -1,3 +1,4 @@
+use crate::error::Error;
 use crate::kmer::Orientation;
 use bio::alignment::sparse::{hash_kmers, HashMapFx};
 use bio::alphabets::dna;
@@ -9,18 +10,17 @@ use std::collections::HashMap;
 
 // TODO: Maybe better us FMDIndex and concatenate fmindex for forward and reverse as
 // https://docs.rs/bio/0.31.0/src/bio/data_structures/fmindex.rs.html#417
-pub struct Reference<'a> {
+pub struct Reference {
     pub(crate) fmindex: FMIndex<BWT, Less, Occ>,
     pub(crate) sa: RawSuffixArray,
-    pub(crate) seq: &'a [u8],
-    pub(crate) revcomp: Vec<u8>,
-    pub(crate) ref_len: usize,
 }
 
-// TODO: in order to hash reverse comp need to create it might be better to own the key in hash
-// then in some cases
-impl<'a> Reference<'a> {
-    pub fn new(seq: &'a [u8]) -> Self {
+type Result<T> = std::result::Result<T, Error>;
+
+// TODO: Need to create singletons using full sequences from record
+
+impl Reference {
+    pub fn new(seq: &[u8]) -> Self {
         let ref_len = seq.len();
         let revcomp = dna::revcomp(seq);
         let text_builder: Vec<&[u8]> = vec![seq, b"$", &revcomp, b"$"];
@@ -34,19 +34,33 @@ impl<'a> Reference<'a> {
 
         let fmindex = FMIndex::new(bwt, less, occ);
 
-        Self {
-            fmindex,
-            sa,
-            seq,
-            revcomp,
-            ref_len,
-        }
+        Self { fmindex, sa }
     }
 
-    pub fn search_pattern(&self, pattern: &[u8]) -> (Vec<usize>, Vec<usize>) {
-        let sai = self.fmindex.backward_search(pattern.iter());
-        let positions = sai.occ(&self.sa);
-        positions.iter().partition(|pos| **pos < self.ref_len)
+    pub fn from_reader<T: std::io::Read>(rdr: fasta::Reader<T>) -> Result<Self> {
+        let mut text_builder = Vec::new();
+        for record in rdr.records() {
+            let record = record?;
+            let seq = record.seq();
+            let revcomp = dna::revcomp(seq.to_vec());
+            text_builder.push(vec![seq, b"$", &revcomp[..], b"$"].concat());
+        }
+        let text = text_builder.concat();
+
+        let (fmindex, sa) = Self::create_fm_index(&text[..]);
+
+        Ok(Self { fmindex, sa })
+    }
+
+    fn create_fm_index(text: &[u8]) -> (FMIndex<BWT, Less, Occ>, RawSuffixArray) {
+        let alphabet = dna::n_alphabet();
+        let sa = suffix_array(&text);
+        let bwt = bwt(&text, &sa);
+        let less = less(&bwt, &alphabet);
+        let occ = Occ::new(&bwt, crate::DEFAULT_SAMPLING_RATE_OCC, &alphabet);
+
+        let fmindex = FMIndex::new(bwt, less, occ);
+        (fmindex, sa)
     }
 }
 
@@ -138,25 +152,26 @@ pub fn hash_kmers_with_counts(seq: &[u8], kmer_size: usize) -> HashMap<&[u8], us
 
     hashes
 }
+
 #[cfg(test)]
 mod tests {
 
     use super::*;
 
-    #[test]
-    fn test_ref_creation() {
-        let text = b"GCCTTAACATTATTACGCCTA";
-        let reference = Reference::new(text);
+    // #[test]
+    // fn test_ref_creation() {
+    // let text = b"GCCTTAACATTATTACGCCTA";
+    // let reference = Reference::new(text);
 
-        let pattern = b"GGC";
+    // let pattern = b"GGC";
 
-        let (fwd_matches, mut rev_matches) = reference.search_pattern(pattern);
+    // let (fwd_matches, mut rev_matches) = reference.search_pattern(pattern);
 
-        rev_matches.remove(0);
+    // rev_matches.remove(0);
 
-        assert!(fwd_matches.is_empty());
-        assert_eq!(rev_matches.len(), 1);
-    }
+    // assert!(fwd_matches.is_empty());
+    // assert_eq!(rev_matches.len(), 1);
+    // }
 
     #[test]
     fn test_ref_real() {
@@ -168,7 +183,7 @@ mod tests {
         let records = reference
             .records()
             .into_iter()
-            .filter_map(Result::ok)
+            .flat_map(|record| record.is_ok())
             .collect::<Vec<fasta::Record>>();
 
         let seqs = records

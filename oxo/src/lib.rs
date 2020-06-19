@@ -7,6 +7,7 @@
 //! specific sequnce contexts as `CCG -> CAG`.
 //!
 
+mod error;
 mod kmer;
 mod reference;
 
