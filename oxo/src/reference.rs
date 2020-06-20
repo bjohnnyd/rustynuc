@@ -234,8 +234,10 @@ mod tests {
         // 4. Check if sufficient N obtained
         // 5. Calculate stats if sufficent otherwise create new oxidized Read
         // TODO: Issue is that a oxo kmer sufficiently different from the singleton
-        // can be produced by multiple kmer sources.  So you want to limit to only one level change
-        // from singleton and remove oxidized that are not uniquk
+        // can be produced by multiple kmer sources.
+        // So you want to limit to only one level change
+        // from singleton and remove oxidized that are not unique and search that there is only one
+        // with 3 or more mismatches close and its difference is 1 (this will reduce the search set considerably)
         let mut info_kmers = singletons
             .into_iter()
             // .take(100)
