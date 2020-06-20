@@ -77,15 +77,26 @@ pub struct OxidizedReads {
 }
 
 impl OxidizedReads {
-    pub fn new(text: &[u8], orientation: Orientation) -> Result<Self> {
+    pub fn new(text: &[u8], orientation: Option<Orientation>) -> Result<Self> {
         let (ref_oxo_nuc, alt_oxo_nuc) = match orientation {
-            Orientation::FWD => (b'G', b'T'),
-            Orientation::REV => (b'C', b'A'),
+            Some(Orientation::FWD) | None => (b'G', b'T'),
+            Some(Orientation::REV) => (b'C', b'A'),
         };
 
         let mut oxidized_reads = Self::oxidize(text, ref_oxo_nuc, alt_oxo_nuc)?;
-        dbg!(&oxidized_reads);
-        let original_read = oxidized_reads.remove(0);
+        let mut original_read = String::new();
+        if orientation.is_none() {
+            let mut rev_oxidized = oxidized_reads
+                .iter()
+                .flat_map(|read| Self::oxidize(read.as_bytes(), b'C', b'A'))
+                .flatten()
+                .collect::<Vec<String>>();
+            let original_read = oxidized_reads.remove(0);
+            let _ = rev_oxidized.remove(0);
+            oxidized_reads.extend(rev_oxidized);
+        } else {
+            original_read = oxidized_reads.remove(0);
+        }
         let read_diffs = oxidized_reads
             .iter()
             .map(|oxo_read| {
@@ -196,33 +207,68 @@ mod tests {
             .collect::<Vec<&[u8]>>()
             .concat();
 
-        #[allow(unused)]
+        // NOTE: Have to reload the reader again after obtaining the sequences from the first read
+        // through
         let mut singletons = Vec::new();
+        let (rdr, _) = niffler::from_path("tests/refs/ref.fa.gz").unwrap();
+        let reference = bio::io::fasta::Reader::new(rdr);
+        let reference = Reference::from_reader(reference).unwrap();
 
         // TODO: this will not work need to create a single reference object for the fasta
         // do i even need the struct, all i need is the singletons with certain n from the fasta
         // probably need to iter over fasta and have fm index of first$first_rev$second$second_rev
         for k in crate::DEFAULT_KMER_SIZE..21 {
             let record_reference = Reference::new(&seqs[..]);
-            let raw_singletons = create_singletons(&seqs[..], k).unwrap();
-            println!(
-                "With kmer size {} found {} singletons",
-                k,
-                raw_singletons.len()
-            );
-            if raw_singletons.len() as u32 > crate::DEFAULT_KMER_MIN {
-                singletons = raw_singletons;
+            singletons = create_singletons(&seqs[..], k).unwrap();
+            println!("With kmer size {} found {} singletons", k, singletons.len());
+            if singletons.len() as u32 > 10 {
                 break;
             }
         }
+
+        // NOTE: Too memory heavy so need to develop a function that processes in batches
+        // 1. Create oxidized comb in batches maybe 10 by 10 windows
+        // 2. Get calculations for that set just calculate occurence in read and occurence of
+        //    reverse complement
+        // 3. Drop it
+        // 4. Check if sufficient N obtained
+        // 5. Calculate stats if sufficent otherwise create new oxidized Read
+        // TODO: Issue is that a oxo kmer sufficiently different from the singleton
+        // can be produced by multiple kmer sources.  So you want to limit to only one level change
+        // from singleton and remove oxidized that are not uniquk
+        let mut info_kmers = singletons
+            .into_iter()
+            // .take(100)
+            .map(|singleton| {
+                let oxo = OxidizedReads::new(singleton.as_bytes(), None).unwrap();
+                oxo.oxidized_reads
+                    .into_iter()
+                    .filter(|read| {
+                        reference.search_pattern(read.as_bytes()).is_empty()
+                            && reference
+                                .search_pattern(&dna::revcomp(read.as_bytes()))
+                                .is_empty()
+                    })
+                    .collect::<Vec<String>>()
+            })
+            .flatten()
+            .collect::<Vec<String>>();
+        info_kmers.sort();
+        info_kmers.dedup();
+        info_kmers.into_iter().for_each(|kmer| {
+            println!(
+                "Oxidized Kmer '{}' and watson crick complement do not occur in the reference",
+                kmer
+            )
+        });
     }
 
     #[test]
     fn test_oxidize() {
         let kmer = b"GCATTGAGTT";
 
-        let fwd_oxo = OxidizedReads::new(kmer, Orientation::FWD).unwrap();
-        let rev_oxo = OxidizedReads::new(kmer, Orientation::REV).unwrap();
+        let fwd_oxo = OxidizedReads::new(kmer, Some(Orientation::FWD)).unwrap();
+        let rev_oxo = OxidizedReads::new(kmer, Some(Orientation::REV)).unwrap();
 
         assert_eq!(fwd_oxo.original_read, rev_oxo.original_read);
 
