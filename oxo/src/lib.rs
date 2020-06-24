@@ -17,6 +17,7 @@ mod reference;
 pub(crate) const DEFAULT_KMER_SIZE: usize = 5;
 pub(crate) const DEFAULT_KMER_MIN: u32 = 10_000;
 pub(crate) const DEFAULT_SAMPLING_RATE_OCC: u32 = 3;
+pub(crate) const NUCLEOTIDES: [u8; 4] = [b'A', b'C', b'G', b'T'];
 
 //TODO: To many combinations to produce even with 10mers
 // however with clostridium exponential growth observed

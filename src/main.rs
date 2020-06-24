@@ -26,10 +26,15 @@ fn main() -> Result<()> {
 
     for p in pileups {
         let pileup = p?;
-        let oxo_pileup = OxoPileup::new(pileup);
 
-        if TEST_ISSUE_POS.contains(&oxo_pileup.ref_pos) {
-            dbg!(&oxo_pileup);
+        match &opt.positions {
+            Some(positions) => {
+                if positions.contains(&pileup.pos()) {
+                    let oxo_pileup = OxoPileup::new(pileup);
+                    println!("{}", &oxo_pileup);
+                }
+            }
+            _ => {}
         }
     }
 

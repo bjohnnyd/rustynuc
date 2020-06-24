@@ -20,6 +20,8 @@ pub(crate) struct RustyNuc {
         default_value = "200"
     )]
     pub(crate) max_depth: u32,
+    #[structopt(short, long, help = "Specific position to investigate")]
+    pub(crate) positions: Option<Vec<u32>>,
     #[structopt(short, long, help = "Optional reference that might increase accuracy")]
     pub(crate) reference: Option<PathBuf>,
     #[structopt(
