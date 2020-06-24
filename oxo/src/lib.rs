@@ -7,8 +7,10 @@
 //! specific sequnce contexts as `CCG -> CAG`.
 //!
 
-mod alignment;
-mod error;
+/// Contains different summaries and representations obtained from BAM files
+pub mod alignment;
+/// Error types associated with reading FASTA, BAM and FASTQ files
+pub mod error;
 mod kmer;
 mod reference;
 

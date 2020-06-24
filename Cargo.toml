@@ -11,6 +11,7 @@ members = ["oxo"]
 [dependencies]
 niffler = "2.1.0"
 structopt = "0.3.14"
+rust-htslib = "0.31.0"
 oxo = { path = "oxo" }
 
 [dev-dependencies]
