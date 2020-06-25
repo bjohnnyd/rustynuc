@@ -18,7 +18,7 @@ static TEST_BAM: &str = "/home/johnny/data/klaus_winzer/alignments/Sub-0-Rep-5_S
 
 fn main() -> Result<()> {
     let opt = cli::RustyNuc::from_args();
-    println!("{:?}", opt);
+    // println!("{:?}", opt);
 
     let mut bam = bam::Reader::from_path(opt.bam)?;
     let mut pileups = bam.pileup();
@@ -30,11 +30,22 @@ fn main() -> Result<()> {
         match &opt.positions {
             Some(positions) => {
                 if positions.contains(&pileup.pos()) {
-                    let oxo_pileup = OxoPileup::new(pileup);
+                    let oxo_pileup =
+                        OxoPileup::new(pileup, Some(opt.min_number_variant), opt.quality);
+                    println!("{}", &oxo_pileup);
+                    if oxo_pileup.is_imbalanced(opt.significance)? {
+                        println!("Significantly Different");
+                    }
+                }
+            }
+            _ => {
+                let oxo_pileup = OxoPileup::new(pileup, Some(opt.min_number_variant), opt.quality);
+                if opt.all {
+                    println!("{}", &oxo_pileup);
+                } else if oxo_pileup.is_imbalanced(opt.significance)? {
                     println!("{}", &oxo_pileup);
                 }
             }
-            _ => {}
         }
     }
 

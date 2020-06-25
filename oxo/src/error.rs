@@ -12,4 +12,7 @@ pub enum Error {
     #[error("Could not process the BAM file")]
     /// Bam Reading Error
     BamError(#[from] rust_htslib::bam::Error),
+    #[error("Count too large for statistical testing")]
+    /// Fisher's exact error
+    FishersError(#[from] fishers_exact::TooLargeValueError),
 }
