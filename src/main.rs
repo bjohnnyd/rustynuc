@@ -1,6 +1,8 @@
 #![warn(missing_debug_implementations, rust_2018_idioms, missing_docs)]
 #![allow(dead_code, unused_variables)]
 //TODO: need to trim and map Sub-0-Rep-5 from run3 and compare to current
+//TODO: Need to probably keep fishers test but deal differently and instead of FDR
+//      make OR or similar, like GATK
 //! QC tool for assesment of likelihood of oxo-G related variation in reads.
 //! Currently not applicable for multigenomic experiments due to assumptions made.
 
