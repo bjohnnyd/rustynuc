@@ -15,8 +15,8 @@ pub(crate) struct RustyNuc {
     pub(crate) quality: Option<u8>,
     #[structopt(long, help = "Maximum pileup depth to use", default_value = "200")]
     pub(crate) max_depth: u32,
-    #[structopt(long, help = "P-value signficance threshold", default_value = "0.05")]
-    pub(crate) significance: f32,
+    #[structopt(long, help = "FDR threshold", default_value = "0.1")]
+    pub(crate) fdr: f64,
     #[structopt(short, long, help = "Specific position to investigate")]
     pub(crate) positions: Option<Vec<u32>>,
     #[structopt(short, long, help = "Optional reference that might increase accuracy")]

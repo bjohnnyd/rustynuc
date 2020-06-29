@@ -13,7 +13,7 @@ type Result<T> = std::result::Result<T, Error>;
 // 5. Second pass collect fragment locations
 // 6. Either return fragment IDs
 // or if fastq provided remove reads from those fragments
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 /// Contains summary of a pileup split into
 /// `first in pair` and `second in pair`.
 /// Contains helper functions for determining likelihood of
@@ -31,7 +31,7 @@ pub struct OxoPileup {
     pub min_count: Option<u32>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 /// Contains nucleotide counts for a specific position
 pub struct NucleotideCount(pub HashMap<u8, u32>);
 
@@ -104,7 +104,7 @@ impl OxoPileup {
     /// on ff v fr
     // TODO: This should return p-value and then needs to be corrected by FDR(order first and then just threshold) or Bonferroni
     // (stricter)
-    pub fn is_imbalanced(&self, sig: f32) -> Result<bool> {
+    pub fn is_imbalanced(&self, sig: f64) -> Result<bool> {
         let ff_nuc_counts = crate::NUCLEOTIDES
             .iter()
             .map(|nuc| *self.ff_count.0.get(nuc).unwrap_or(&0))
@@ -145,10 +145,11 @@ impl OxoPileup {
             _ => (true, true),
         };
 
-        Ok((p_ac.two_tail_pvalue < sig as f64 && ac_sufficient)
-            || (p_gt.two_tail_pvalue < sig as f64 && gt_sufficient))
+        Ok((p_ac.two_tail_pvalue < sig && ac_sufficient)
+            || (p_gt.two_tail_pvalue < sig && gt_sufficient))
     }
 
+    /// Returns the two-tailed p.value for the A/C comparison
     pub fn p_ac(&self) -> f64 {
         let ff_nuc_counts = crate::NUCLEOTIDES
             .iter()
@@ -170,6 +171,8 @@ impl OxoPileup {
         let p_ac = fishers_exact(&ac_counts).unwrap();
         p_ac.two_tail_pvalue
     }
+
+    /// Returns the two-tailed p.value for the G/T comparison
     pub fn p_gt(&self) -> f64 {
         let ff_nuc_counts = crate::NUCLEOTIDES
             .iter()
@@ -191,7 +194,25 @@ impl OxoPileup {
         let p_gt = fishers_exact(&gt_counts).unwrap();
         p_gt.two_tail_pvalue
     }
+
+    /// Returns the smaller of the A/C and G/T two-tailed p.values
+    pub fn min_p_value(&self) -> f64 {
+        let ac = self.p_ac();
+        let gt = self.p_gt();
+
+        if ac < gt {
+            ac
+        } else {
+            gt
+        }
+    }
 }
+
+// impl PartialOrd for OxoPileup {
+// fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+// self.min_p_value().partial_cmp(&other.min_p_value())
+// }
+// }
 
 impl std::fmt::Display for OxoPileup {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -210,6 +231,6 @@ impl std::fmt::Display for OxoPileup {
             // ff_count, fr_count, sf_count, sr_count
             // ));
         }
-        write!(f, "{}\tA/C:{}\tG/T:{}", summary, self.p_ac(), self.p_gt())
+        write!(f, "{}\t{}\t{}", summary, self.p_ac(), self.p_gt())
     }
 }
