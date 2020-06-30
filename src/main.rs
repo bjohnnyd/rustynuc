@@ -4,19 +4,19 @@
 //TODO: Need to probably keep fishers test but deal differently and instead of FDR
 //      make OR or similar, like GATK
 //! QC tool for assesment of likelihood of oxo-G related variation in reads.
-//! Currently not applicable for multigenomic experiments due to assumptions made.
 
+mod alignment;
 mod cli;
+mod error;
 
-use oxo::alignment::OxoPileup;
+use crate::alignment::OxoPileup;
 use rust_htslib::{bam, bam::Read};
 use structopt::StructOpt;
 
-type Result<T> = std::result::Result<T, oxo::error::Error>;
+/// Nucleotide alphabet used
+pub const NUCLEOTIDES: [u8; 4] = [b'A', b'C', b'G', b'T'];
 
-static TEST_ISSUE_POS: [u32; 4] = [2977104, 2981956, 2982320, 2982432];
-
-static TEST_BAM: &str = "/home/johnny/data/klaus_winzer/alignments/Sub-0-Rep-5_S1_LMERGED.bam";
+type Result<T> = std::result::Result<T, crate::error::Error>;
 
 fn main() -> Result<()> {
     let opt = cli::RustyNuc::from_args();

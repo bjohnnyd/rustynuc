@@ -684,19 +684,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a86ed3f5f244b372d6b1a00b72ef7f8876d0bc6a78a4c9985c53614041512063"
 
 [[package]]
-name = "oxo"
-version = "0.1.0"
-dependencies = [
- "bio",
- "fishers_exact",
- "niffler",
- "predicates",
- "rust-htslib",
- "thiserror",
- "walkdir",
-]
-
-[[package]]
 name = "percent-encoding"
 version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -910,11 +897,14 @@ name = "rustynuc"
 version = "0.1.0"
 dependencies = [
  "assert_cmd",
+ "bio",
+ "fishers_exact",
  "niffler",
- "oxo",
  "predicates",
  "rust-htslib",
  "structopt",
+ "thiserror",
+ "walkdir",
 ]
 
 [[package]]
