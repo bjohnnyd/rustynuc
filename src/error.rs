@@ -15,4 +15,7 @@ pub enum Error {
     #[error("Count too large for statistical testing")]
     /// Fisher's exact error
     FishersError(#[from] fishers_exact::TooLargeValueError),
+    #[error("Could not create a reader for the FASTA file")]
+    /// Read FASTA error
+    FastaError(#[from] niffler::Error),
 }
