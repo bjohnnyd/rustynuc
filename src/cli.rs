@@ -4,6 +4,12 @@ use structopt::StructOpt;
 #[derive(Debug, StructOpt)]
 #[structopt(rename_all = "kebab-case")]
 pub(crate) struct RustyNuc {
+    /// Number of threads
+    #[structopt(short, long, default_value = "4")]
+    pub threads: usize,
+    /// Determines verbosity of the processing, can be specified multiple times -vvv
+    #[structopt(short, long, parse(from_occurrences))]
+    pub verbosity: u8,
     #[structopt(
         short,
         long,
@@ -44,4 +50,22 @@ pub(crate) struct RustyNuc {
         parse(from_os_str)
     )]
     pub(crate) bam: PathBuf,
+}
+
+impl RustyNuc {
+    pub fn set_logging(&self) {
+        use log::LevelFilter::*;
+
+        let log_level = match self.verbosity {
+            level if level == 1 => Info,
+            level if level == 2 => Debug,
+            level if level > 2 => Trace,
+            _ => Warn,
+        };
+
+        env_logger::builder()
+            .format_module_path(false)
+            .filter_module("rustynuc", log_level)
+            .init();
+    }
 }

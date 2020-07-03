@@ -18,4 +18,7 @@ pub enum Error {
     #[error("Could not create a reader for the FASTA file")]
     /// Read FASTA error
     FastaError(#[from] niffler::Error),
+    #[error("Could not spawn threads")]
+    /// Create thread pools erorr
+    ThreadError,
 }
