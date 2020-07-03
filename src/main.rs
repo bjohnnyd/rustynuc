@@ -38,6 +38,7 @@ fn main() -> Result<()> {
 
     let fdr = opt.alpha;
     let mut seq_map = None;
+    let mut id_map = HashMap::<u32, String>::new();
 
     if let Some(path) = opt.reference {
         let (rdr, _) = niffler::from_path(path)?;
@@ -47,12 +48,14 @@ fn main() -> Result<()> {
 
     for p in pileups {
         let pileup = p?;
-        oxo_pileups.push(OxoPileup::new(
-            pileup,
-            Some(opt.min_number_variant),
-            opt.quality,
-        ));
+        let oxo = OxoPileup::new(pileup, Some(opt.min_number_variant), opt.quality);
+        id_map.insert(
+            oxo.ref_id,
+            String::from_utf8(header.tid2name(oxo.ref_id).to_vec())?,
+        );
+        oxo_pileups.push(oxo);
     }
+
     let mut oxo_pileups = oxo_pileups
         .iter()
         .enumerate()
@@ -75,31 +78,20 @@ fn main() -> Result<()> {
         .map(|(i, p, pval)| {
             let fdr_sig = *i < significant;
             if let Some(ref reference) = seq_map {
-                let id_name = header.tid2name(p.ref_id);
-                let seq_name = String::from_utf8(id_name.to_vec())?;
-                let record = reference.get(&seq_name);
+                let seq_name = id_map.get(&p.ref_id).unwrap();
+                // let seq_name = String::from_utf8(id_name.to_vec())?;
+                let seq = reference.get(seq_name);
                 // reference.iter().for_each(|(k, v)| println!("{}", k));
-                match &record {
-                    Some(record) => {
-                        let seq = record.seq();
+                match &seq {
+                    Some(seq) => {
                         let idx = (seq.len() - 1) as u32;
                         let context = match p.ref_pos {
-                            0 => format!("X{}", String::from_utf8(seq[0..2].to_vec())?),
+                            0 => format!("X{}", &seq[0..2]),
                             last_idx if last_idx == idx => {
                                 let last_idx = last_idx as usize;
-                                format!(
-                                    "{}X",
-                                    String::from_utf8(
-                                        seq[(last_idx - 1)..(last_idx + 1)].to_vec()
-                                    )?
-                                )
+                                format!("{}X", &seq[(last_idx - 1)..(last_idx + 1)])
                             }
-                            i => format!(
-                                "{}",
-                                String::from_utf8(
-                                    seq[(i - 1) as usize..(i + 2) as usize].to_vec()
-                                )?
-                            ),
+                            i => format!("{}", &seq[(i - 1) as usize..(i + 2) as usize]),
                         };
 
                         println!("{}\t{}\t{}\t{}", &seq_name, p, fdr_sig, context);
@@ -125,11 +117,14 @@ fn main() -> Result<()> {
 // TODO: Cannot return fasta::Record to share between threads
 fn create_seq_map<T: std::io::Read>(
     rdr: bio::io::fasta::Reader<T>,
-) -> Result<HashMap<String, bio::io::fasta::Record>> {
-    let mut seq_map = HashMap::<String, bio::io::fasta::Record>::new();
+) -> Result<HashMap<String, String>> {
+    let mut seq_map = HashMap::<String, String>::new();
     for record in rdr.records() {
         let record = record?;
-        seq_map.insert(record.id().to_string(), record);
+        seq_map.insert(
+            record.id().to_string(),
+            String::from_utf8(record.seq().to_vec())?,
+        );
     }
     Ok(seq_map)
 }
