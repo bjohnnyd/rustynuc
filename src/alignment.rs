@@ -39,7 +39,7 @@ pub struct NucleotideCount(pub HashMap<u8, u32>);
 // TODO: Needs refactoring kind of repetitive
 impl OxoPileup {
     /// Creates a pileup summary in terms of `F1R2` and `F2R1`
-    pub fn new(pileup: Pileup, min_count: Option<u32>, min_qual: Option<u8>) -> Self {
+    pub fn new(pileup: Pileup, min_count: Option<u32>, min_qual: u8) -> Self {
         let ref_id = pileup.tid();
         let ref_depth = pileup.depth();
         let ref_pos = pileup.pos();
@@ -56,17 +56,7 @@ impl OxoPileup {
                 let base = record.seq()[pos];
                 let qual = record.qual()[pos];
 
-                let is_first = match min_qual {
-                    Some(min_qual) => record.is_first_in_template() && qual > min_qual,
-                    None => record.is_first_in_template(),
-                };
-
-                let is_second = match min_qual {
-                    Some(min_qual) => record.is_last_in_template() && qual > min_qual,
-                    None => record.is_last_in_template(),
-                };
-
-                if is_first {
+                if record.is_first_in_template() && qual > min_qual {
                     if record.is_reverse() {
                         let count = fr_count.0.entry(base).or_insert(0);
                         *count += 1;
@@ -76,7 +66,7 @@ impl OxoPileup {
                     }
                 }
 
-                if is_second {
+                if record.is_last_in_template() && qual > min_qual {
                     if record.is_reverse() {
                         let count = sr_count.0.entry(base).or_insert(0);
                         *count += 1;
@@ -208,12 +198,6 @@ impl OxoPileup {
     }
 }
 
-// impl PartialOrd for OxoPileup {
-// fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-// self.min_p_value().partial_cmp(&other.min_p_value())
-// }
-// }
-
 impl std::fmt::Display for OxoPileup {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut summary = format!("{}\t{}", self.ref_pos, self.ref_depth);
@@ -222,14 +206,6 @@ impl std::fmt::Display for OxoPileup {
             let fr_count = self.fr_count.0.get(nuc).unwrap_or(&0_u32);
 
             summary.push_str(&format!("\t{}:{}", ff_count, fr_count,));
-
-            // let sf_count = self.sf_count.0.get(nuc).unwrap_or(&0_u32);
-            // let sr_count = self.sr_count.0.get(nuc).unwrap_or(&0_u32);
-
-            // summary.push_str(&format!(
-            // "\t{}:{},{}:{}",
-            // ff_count, fr_count, sf_count, sr_count
-            // ));
         }
         write!(f, "{}\t{}\t{}", summary, self.p_ac(), self.p_gt())
     }

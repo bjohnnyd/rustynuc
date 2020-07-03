@@ -10,7 +10,6 @@ mod cli;
 mod error;
 
 use crate::alignment::OxoPileup;
-use bio::io::fasta::Record;
 use log::warn;
 use rust_htslib::{bam, bam::Read};
 use std::collections::HashMap;
@@ -29,21 +28,13 @@ fn main() -> Result<()> {
     let mut bam = bam::Reader::from_path(opt.bam)?;
     let header = bam.header().clone();
 
-    let records = match opt.reference {
-        Some(fpath) => Some(read_reference(fpath)?),
-        None => None,
-    };
-
-    let records = records
-        .into_iter()
-        .collect::<Vec<Record<Box<dyn std::io::Read>>>>();
-
-    let seq_map = match records {
-        Some(records) => {
-            let mut seq_map = HashMap::<&[u8], &[u8]>::new();
+    let seq_map = match opt.reference {
+        Some(fpath) => {
+            let mut seq_map = HashMap::<String, Vec<u8>>::new();
+            let records = read_reference(fpath)?;
             for record in records {
                 let record = record?;
-                seq_map.insert(record.id().as_bytes(), record.seq());
+                seq_map.insert(record.id().to_string(), record.seq().to_vec());
             }
             Some(seq_map)
         }
@@ -82,38 +73,40 @@ fn main() -> Result<()> {
     for (i, (p, pval)) in oxo_pileups.iter().enumerate() {
         let fdr_sig = i < significant;
         if let Some(ref reference) = seq_map {
-            let seq_name = header.tid2name(p.ref_id);
+            let id_name = header.tid2name(p.ref_id);
+            let seq_name = String::from_utf8(id_name.to_vec())?;
             let seq = reference.get(&seq_name);
+            // reference.iter().for_each(|(k, v)| println!("{}", k));
             match &seq {
                 Some(seq) => {
                     let idx = (seq.len() - 1) as u32;
                     let context = match p.ref_pos {
-                        0 => format!("X_{}", String::from_utf8(seq[0..0].to_vec())?),
+                        0 => format!("X{}", String::from_utf8(seq[0..2].to_vec())?),
                         last_idx if last_idx == idx => {
                             let last_idx = last_idx as usize;
-                            format!("{}_X", String::from_utf8(seq[last_idx..last_idx].to_vec())?)
+                            format!(
+                                "{}X",
+                                String::from_utf8(seq[(last_idx - 1)..(last_idx + 1)].to_vec())?
+                            )
                         }
-                        i => {
-                            let left_idx = (i - 1) as usize;
-                            let right_idx = (i + 1) as usize;
-                            let left_nuc = String::from_utf8(seq[left_idx..left_idx].to_vec())?;
-                            let right_nuc = String::from_utf8(seq[right_idx..right_idx].to_vec())?;
-                            format!("{}_{}", left_nuc, right_nuc)
-                        }
+                        i => format!(
+                            "{}",
+                            String::from_utf8(seq[(i - 1) as usize..(i + 2) as usize].to_vec())?
+                        ),
                     };
 
-                    println!("{}\t{}\t{}\t{}", p, pval, fdr_sig, context);
+                    println!("{}\t{}\t{}\t{}\t{}", &seq_name, p, pval, fdr_sig, context);
                 }
                 None => {
                     warn!(
                         "The reference provided does not have record present in the bam file, {}",
-                        String::from_utf8(seq_name.to_vec())?
+                        &seq_name
                     );
-                    println!("{}\t{}\t{}", p, pval, fdr_sig);
+                    println!("{}\t{}\t{}\t{}", p.ref_id, p, pval, fdr_sig);
                 }
             }
         } else {
-            println!("{}\t{}\t{}", p, pval, fdr_sig);
+            println!("{}\t{}\t{}\t{}", p.ref_id, p, pval, fdr_sig);
         }
     }
 
