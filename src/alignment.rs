@@ -23,11 +23,8 @@ pub struct OxoPileup {
     pub ref_id: u32,
     pub ref_depth: u32,
     pub ref_pos: u32,
-    // ref_base: Option<u8>,
     pub ff_count: NucleotideCount,
     pub fr_count: NucleotideCount,
-    pub sf_count: NucleotideCount,
-    pub sr_count: NucleotideCount,
     pub min_count: Option<u32>,
 }
 
@@ -47,9 +44,6 @@ impl OxoPileup {
         let mut ff_count = NucleotideCount(HashMap::new());
         let mut fr_count = NucleotideCount(HashMap::new());
 
-        let mut sf_count = NucleotideCount(HashMap::new());
-        let mut sr_count = NucleotideCount(HashMap::new());
-
         for alignment in pileup.alignments() {
             if let Some(pos) = alignment.qpos() {
                 let record = alignment.record();
@@ -65,16 +59,6 @@ impl OxoPileup {
                         *count += 1;
                     }
                 }
-
-                if record.is_last_in_template() && qual > min_qual {
-                    if record.is_reverse() {
-                        let count = sr_count.0.entry(base).or_insert(0);
-                        *count += 1;
-                    } else {
-                        let count = sf_count.0.entry(base).or_insert(0);
-                        *count += 1;
-                    }
-                }
             }
         }
 
@@ -84,8 +68,6 @@ impl OxoPileup {
             ref_pos,
             ff_count,
             fr_count,
-            sf_count,
-            sr_count,
             min_count,
         }
     }
@@ -139,8 +121,14 @@ impl OxoPileup {
             || (p_gt.two_tail_pvalue < sig && gt_sufficient))
     }
 
-    /// Returns the two-tailed p.value for the A/C comparison
-    pub fn p_ac(&self) -> f64 {
+    /// Returns the two-tailed p.value for the A/C or G/T comparison
+    pub fn get_pval(&self, nuc: u8) -> Result<f64> {
+        let idx = match nuc {
+            b'A' | b'C' => 0,
+            b'G' | b'T' => 2,
+            _ => return Err(Error::IncorrectNuc(nuc.to_string())),
+        };
+
         let ff_nuc_counts = crate::NUCLEOTIDES
             .iter()
             .map(|nuc| *self.ff_count.0.get(nuc).unwrap_or(&0))
@@ -151,55 +139,31 @@ impl OxoPileup {
             .map(|nuc| *self.fr_count.0.get(nuc).unwrap_or(&0))
             .collect::<Vec<u32>>();
 
-        let ac_counts = [
-            ff_nuc_counts[0],
-            fr_nuc_counts[0],
-            ff_nuc_counts[1],
-            fr_nuc_counts[1],
+        let counts = [
+            ff_nuc_counts[idx],
+            fr_nuc_counts[idx],
+            ff_nuc_counts[idx + 1],
+            fr_nuc_counts[idx + 1],
         ];
 
-        let p_ac = fishers_exact(&ac_counts).unwrap();
-        p_ac.two_tail_pvalue
-    }
-
-    /// Returns the two-tailed p.value for the G/T comparison
-    pub fn p_gt(&self) -> f64 {
-        let ff_nuc_counts = crate::NUCLEOTIDES
-            .iter()
-            .map(|nuc| *self.ff_count.0.get(nuc).unwrap_or(&0))
-            .collect::<Vec<u32>>();
-
-        let fr_nuc_counts = crate::NUCLEOTIDES
-            .iter()
-            .map(|nuc| *self.fr_count.0.get(nuc).unwrap_or(&0))
-            .collect::<Vec<u32>>();
-
-        let gt_counts = [
-            ff_nuc_counts[2],
-            fr_nuc_counts[2],
-            ff_nuc_counts[3],
-            fr_nuc_counts[3],
-        ];
-
-        let p_gt = fishers_exact(&gt_counts).unwrap();
-        p_gt.two_tail_pvalue
+        let fisher_result = fishers_exact(&counts).unwrap();
+        Ok(fisher_result.two_tail_pvalue)
     }
 
     /// Returns the smaller of the A/C and G/T two-tailed p.values
-    pub fn min_p_value(&self) -> f64 {
-        let ac = self.p_ac();
-        let gt = self.p_gt();
+    pub fn min_p_value(&self) -> Result<f64> {
+        let ac = self.get_pval(b'A')?;
+        let gt = self.get_pval(b'G')?;
 
         if ac < gt {
-            ac
+            Ok(ac)
         } else {
-            gt
+            Ok(gt)
         }
     }
-}
 
-impl std::fmt::Display for OxoPileup {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    /// Crates a string representation of the OxoPileup summary
+    pub fn to_string(&self) -> Result<String> {
         let mut summary = format!("{}\t{}", self.ref_pos, self.ref_depth);
         for nuc in crate::NUCLEOTIDES.iter() {
             let ff_count = self.ff_count.0.get(nuc).unwrap_or(&0_u32);
@@ -207,6 +171,11 @@ impl std::fmt::Display for OxoPileup {
 
             summary.push_str(&format!("\t{}:{}", ff_count, fr_count,));
         }
-        write!(f, "{}\t{}\t{}", summary, self.p_ac(), self.p_gt())
+        Ok(format!(
+            "{}\t{}\t{}",
+            summary,
+            self.get_pval(b'A')?,
+            self.get_pval(b'G')?
+        ))
     }
 }

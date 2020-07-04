@@ -59,7 +59,13 @@ fn main() -> Result<()> {
     let mut oxo_pileups = oxo_pileups
         .iter()
         .enumerate()
-        .map(|(i, oxo_pileup)| (i, oxo_pileup, oxo_pileup.min_p_value()))
+        .flat_map(|(i, oxo_pileup)| match oxo_pileup.min_p_value() {
+            Ok(pval) => Some((i, oxo_pileup, pval)),
+            _ => {
+                warn!("Could not calculate minimal p-value for the fisher's exact test");
+                None
+            }
+        })
         .collect::<Vec<(usize, &OxoPileup, f64)>>();
     oxo_pileups.sort_by(|a, b| a.2.partial_cmp(&b.2).unwrap());
 
@@ -92,18 +98,24 @@ fn main() -> Result<()> {
                             i => format!("{}", &seq[(i - 1) as usize..(i + 2) as usize]),
                         };
 
-                        println!("{}\t{}\t{}\t{}", &seq_name, p, fdr_sig, context);
+                        println!(
+                            "{}\t{}\t{}\t{}",
+                            &seq_name,
+                            p.to_string()?,
+                            fdr_sig,
+                            context
+                        );
                     }
                     None => {
                         warn!(
                         "The reference provided does not have record present in the bam file, {}",
                         &seq_name
                     );
-                        println!("{}\t{}\t{}", p.ref_id, p, fdr_sig);
+                        println!("{}\t{}\t{}", p.ref_id, p.to_string()?, fdr_sig);
                     }
                 }
             } else {
-                println!("{}\t{}\t{}", p.ref_id, p, fdr_sig);
+                println!("{}\t{}\t{}", p.ref_id, p.to_string()?, fdr_sig);
             }
             Ok(())
         })

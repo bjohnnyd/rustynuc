@@ -21,4 +21,7 @@ pub enum Error {
     #[error("Could not spawn threads")]
     /// Create thread pools erorr
     ThreadError,
+    #[error("Only A, G, C and T nucleotides are allowed but got {0}")]
+    /// Incorect nucleotide supplied
+    IncorrectNuc(String),
 }
