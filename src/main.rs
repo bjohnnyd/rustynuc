@@ -79,9 +79,7 @@ fn main() -> Result<()> {
             let fdr_sig = *i < significant;
             if let Some(ref reference) = seq_map {
                 let seq_name = id_map.get(&p.ref_id).unwrap();
-                // let seq_name = String::from_utf8(id_name.to_vec())?;
                 let seq = reference.get(seq_name);
-                // reference.iter().for_each(|(k, v)| println!("{}", k));
                 match &seq {
                     Some(seq) => {
                         let idx = (seq.len() - 1) as u32;
