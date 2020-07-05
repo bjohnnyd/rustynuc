@@ -5,14 +5,6 @@ use std::collections::HashMap;
 
 type Result<T> = std::result::Result<T, Error>;
 
-// TODO: Need to test if just doing a fishers exact test on:
-// 1  A+C ff v A+C fr
-// 2. G+T ff v G+T fr
-// 3. First Pass get positional summaries
-// 4. Identify issue positions and forward or reverse
-// 5. Second pass collect fragment locations
-// 6. Either return fragment IDs
-// or if fastq provided remove reads from those fragments
 #[derive(Debug, Eq, PartialEq)]
 /// Contains summary of a pileup split into
 /// `first in pair` and `second in pair`.
@@ -32,8 +24,6 @@ pub struct OxoPileup {
 /// Contains nucleotide counts for a specific position
 pub struct NucleotideCount(pub HashMap<u8, u32>);
 
-// TODO: Need to decide if want to implement the reference base
-// TODO: Needs refactoring kind of repetitive
 impl OxoPileup {
     /// Creates a pileup summary in terms of `F1R2` and `F2R1`
     pub fn new(pileup: Pileup, min_count: Option<u32>, min_qual: u8) -> Self {
@@ -177,5 +167,9 @@ impl OxoPileup {
             self.get_pval(b'A')?,
             self.get_pval(b'G')?
         ))
+    }
+
+    pub fn to_bed_entry(&self, seq_map: Option<&HashMap<String, String>>) -> String {
+        unimplemented!()
     }
 }
