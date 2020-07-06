@@ -50,6 +50,12 @@ pub(crate) struct RustyNuc {
         parse(from_os_str)
     )]
     pub(crate) bam: PathBuf,
+    #[structopt(
+        short,
+        long,
+        help = "Whether to use pseudocounts (adds +1 to all counts) when calculating statistics"
+    )]
+    pub(crate) pseudocount: bool,
 }
 
 impl RustyNuc {

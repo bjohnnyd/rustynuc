@@ -3,8 +3,7 @@
 //TODO: need to trim and map Sub-0-Rep-5 from run3 and compare to current
 //TODO: Need to probably keep fishers test but deal differently and instead of FDR
 //      make OR or similar, like GATK
-//! QC tool for assesment of likelihood of oxo-G related variation in reads.
-
+//! QC tool for assesment of likelihood of oxo-G related variation in reads.  
 mod alignment;
 mod cli;
 mod error;
@@ -48,7 +47,12 @@ fn main() -> Result<()> {
 
     for p in pileups {
         let pileup = p?;
-        let oxo = OxoPileup::new(pileup, Some(opt.min_number_variant), opt.quality);
+        let oxo = OxoPileup::new(
+            pileup,
+            Some(opt.min_number_variant),
+            opt.quality,
+            opt.pseudocount,
+        );
         id_map.insert(
             oxo.ref_id,
             String::from_utf8(header.tid2name(oxo.ref_id).to_vec())?,
@@ -88,22 +92,10 @@ fn main() -> Result<()> {
                 let seq = reference.get(seq_name);
                 match &seq {
                     Some(seq) => {
-                        let idx = (seq.len() - 1) as u32;
-                        let context = match p.ref_pos {
-                            0 => format!("X{}", &seq[0..2]),
-                            last_idx if last_idx == idx => {
-                                let last_idx = last_idx as usize;
-                                format!("{}X", &seq[(last_idx - 1)..(last_idx + 1)])
-                            }
-                            i => format!("{}", &seq[(i - 1) as usize..(i + 2) as usize]),
-                        };
-
                         println!(
-                            "{}\t{}\t{}\t{}",
-                            &seq_name,
-                            p.to_string()?,
-                            fdr_sig,
-                            context
+                            "{}\t{}",
+                            p.to_bed_entry(Some(&id_map))?,
+                            get_seq_context(seq, p.ref_pos)
                         );
                     }
                     None => {
@@ -111,11 +103,11 @@ fn main() -> Result<()> {
                         "The reference provided does not have record present in the bam file, {}",
                         &seq_name
                     );
-                        println!("{}\t{}\t{}", p.ref_id, p.to_string()?, fdr_sig);
+                        println!("{}", p.to_bed_entry(Some(&id_map))?);
                     }
                 }
             } else {
-                println!("{}\t{}\t{}", p.ref_id, p.to_string()?, fdr_sig);
+                println!("{}", p.to_bed_entry(Some(&id_map))?);
             }
             Ok(())
         })
@@ -137,4 +129,16 @@ fn create_seq_map<T: std::io::Read>(
         );
     }
     Ok(seq_map)
+}
+
+fn get_seq_context(seq: &str, pos: u32) -> String {
+    let idx = (seq.len() - 1) as u32;
+    match pos {
+        0 => format!("X{}", &seq[0..2]),
+        last_idx if last_idx == idx => {
+            let last_idx = last_idx as usize;
+            format!("{}X", &seq[(last_idx - 1)..(last_idx + 1)])
+        }
+        i => format!("{}", &seq[(i - 1) as usize..(i + 2) as usize]),
+    }
 }

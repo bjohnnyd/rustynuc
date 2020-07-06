@@ -18,6 +18,7 @@ pub struct OxoPileup {
     pub ff_count: NucleotideCount,
     pub fr_count: NucleotideCount,
     pub min_count: Option<u32>,
+    pub pseudocount: u32,
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -26,10 +27,11 @@ pub struct NucleotideCount(pub HashMap<u8, u32>);
 
 impl OxoPileup {
     /// Creates a pileup summary in terms of `F1R2` and `F2R1`
-    pub fn new(pileup: Pileup, min_count: Option<u32>, min_qual: u8) -> Self {
+    pub fn new(pileup: Pileup, min_count: Option<u32>, min_qual: u8, pseudocount: bool) -> Self {
         let ref_id = pileup.tid();
         let ref_depth = pileup.depth();
         let ref_pos = pileup.pos();
+        let pseudocount = if pseudocount { 1 } else { 0 };
 
         let mut ff_count = NucleotideCount(HashMap::new());
         let mut fr_count = NucleotideCount(HashMap::new());
@@ -42,10 +44,10 @@ impl OxoPileup {
 
                 if record.is_first_in_template() && qual > min_qual {
                     if record.is_reverse() {
-                        let count = fr_count.0.entry(base).or_insert(0);
+                        let count = fr_count.0.entry(base).or_insert(pseudocount);
                         *count += 1;
                     } else {
-                        let count = ff_count.0.entry(base).or_insert(0);
+                        let count = ff_count.0.entry(base).or_insert(pseudocount);
                         *count += 1;
                     }
                 }
@@ -59,6 +61,7 @@ impl OxoPileup {
             ff_count,
             fr_count,
             min_count,
+            pseudocount,
         }
     }
 
@@ -69,12 +72,12 @@ impl OxoPileup {
     pub fn is_imbalanced(&self, sig: f64) -> Result<bool> {
         let ff_nuc_counts = crate::NUCLEOTIDES
             .iter()
-            .map(|nuc| *self.ff_count.0.get(nuc).unwrap_or(&0))
+            .map(|nuc| *self.ff_count.0.get(nuc).unwrap_or(&self.pseudocount))
             .collect::<Vec<u32>>();
 
         let fr_nuc_counts = crate::NUCLEOTIDES
             .iter()
-            .map(|nuc| *self.fr_count.0.get(nuc).unwrap_or(&0))
+            .map(|nuc| *self.fr_count.0.get(nuc).unwrap_or(&self.pseudocount))
             .collect::<Vec<u32>>();
 
         let ac_counts = [
@@ -121,12 +124,12 @@ impl OxoPileup {
 
         let ff_nuc_counts = crate::NUCLEOTIDES
             .iter()
-            .map(|nuc| *self.ff_count.0.get(nuc).unwrap_or(&0))
+            .map(|nuc| *self.ff_count.0.get(nuc).unwrap_or(&self.pseudocount))
             .collect::<Vec<u32>>();
 
         let fr_nuc_counts = crate::NUCLEOTIDES
             .iter()
-            .map(|nuc| *self.fr_count.0.get(nuc).unwrap_or(&0))
+            .map(|nuc| *self.fr_count.0.get(nuc).unwrap_or(&self.pseudocount))
             .collect::<Vec<u32>>();
 
         let counts = [
@@ -153,14 +156,15 @@ impl OxoPileup {
     }
 
     /// Crates a string representation of the OxoPileup summary
-    pub fn to_string(&self) -> Result<String> {
-        let mut summary = format!("{}\t{}", self.ref_pos, self.ref_depth);
+    fn to_string(&self) -> Result<String> {
+        let mut summary = format!("{}", self.ref_depth);
         for nuc in crate::NUCLEOTIDES.iter() {
             let ff_count = self.ff_count.0.get(nuc).unwrap_or(&0_u32);
             let fr_count = self.fr_count.0.get(nuc).unwrap_or(&0_u32);
 
             summary.push_str(&format!("\t{}:{}", ff_count, fr_count,));
         }
+
         Ok(format!(
             "{}\t{}\t{}",
             summary,
@@ -169,7 +173,23 @@ impl OxoPileup {
         ))
     }
 
-    pub fn to_bed_entry(&self, seq_map: Option<&HashMap<String, String>>) -> String {
-        unimplemented!()
+    pub fn to_bed_entry(&self, seqid_map: Option<&HashMap<u32, String>>) -> Result<String> {
+        let chrom = match seqid_map {
+            Some(seqid_map) => match seqid_map.get(&self.ref_id) {
+                Some(name) => name.to_string(),
+                None => format!("{}", self.ref_id),
+            },
+            None => format!("{}", self.ref_id),
+        };
+        Ok(format!(
+            "{}\t{}\t{}\t{}\t{}\t{}\t{}",
+            &chrom,
+            self.ref_pos,
+            self.ref_pos + 1,
+            format!("{}_{}_{}", &chrom, self.ref_pos, self.ref_pos + 1),
+            -(self.min_p_value()?.log10()),
+            "*",
+            self.to_string()?,
+        ))
     }
 }
