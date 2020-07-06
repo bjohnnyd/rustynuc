@@ -31,11 +31,12 @@ fn main() -> Result<()> {
 
     let mut bam = bam::Reader::from_path(opt.bam)?;
     let header = bam.header().clone();
+
     let mut pileups = bam.pileup();
     pileups.set_max_depth(opt.max_depth);
     let mut oxo_pileups = Vec::new();
 
-    let fdr = opt.alpha;
+    let alpha = opt.alpha;
     let mut seq_map = None;
     let mut id_map = HashMap::<u32, String>::new();
 
@@ -60,42 +61,36 @@ fn main() -> Result<()> {
         oxo_pileups.push(oxo);
     }
 
-    let mut oxo_pileups = oxo_pileups
-        .iter()
-        .enumerate()
-        .flat_map(|(i, oxo_pileup)| match oxo_pileup.min_p_value() {
-            Ok(pval) => Some((i, oxo_pileup, pval)),
-            _ => {
-                warn!("Could not calculate minimal p-value for the fisher's exact test");
-                None
-            }
-        })
-        .collect::<Vec<(usize, &OxoPileup, f64)>>();
-    oxo_pileups.sort_by(|a, b| a.2.partial_cmp(&b.2).unwrap());
+    // NOTE: If wanting ot use custom error will need to collect into tuple of (i, i.pval) but
+    // could do this in parallel
+    oxo_pileups.sort_by(|a, b| {
+        a.min_p_value()
+            .expect("Could not calculate min pval")
+            .partial_cmp(&b.min_p_value().expect("Could not calculate min pval"))
+            .expect("Could not compare the flot values")
+    });
 
-    let tests = oxo_pileups.len();
-
-    let significant = tests
-        - oxo_pileups
-            .iter()
-            .enumerate()
-            .rev()
-            .take_while(|(i, (_, oxo_pileup, pval))| *pval > (fdr * (*i as f64 / tests as f64)))
-            .count();
+    let m = oxo_pileups.len();
 
     let _ = oxo_pileups
         .par_iter()
-        .map(|(i, p, pval)| {
-            let fdr_sig = *i < significant;
+        .enumerate()
+        .map(|(rank, p)| {
+            let pval = p.min_p_value()?;
+            let qval = (alpha * rank as f32) / m as f32;
+            let sig = if pval < qval as f64 { 1 } else { 0 };
+            let corrected = format!("{}\t{}", qval, sig);
+
             if let Some(ref reference) = seq_map {
                 let seq_name = id_map.get(&p.ref_id).unwrap();
                 let seq = reference.get(seq_name);
                 match &seq {
                     Some(seq) => {
                         println!(
-                            "{}\t{}",
+                            "{}\t{}\t{}",
                             p.to_bed_entry(Some(&id_map))?,
-                            get_seq_context(seq, p.ref_pos)
+                            get_seq_context(seq, p.ref_pos),
+                            corrected
                         );
                     }
                     None => {
@@ -103,11 +98,11 @@ fn main() -> Result<()> {
                         "The reference provided does not have record present in the bam file, {}",
                         &seq_name
                     );
-                        println!("{}", p.to_bed_entry(Some(&id_map))?);
+                        println!("{}\t{}", p.to_bed_entry(Some(&id_map))?, corrected);
                     }
                 }
             } else {
-                println!("{}", p.to_bed_entry(Some(&id_map))?);
+                println!("{}\t{}", p.to_bed_entry(Some(&id_map))?, corrected);
             }
             Ok(())
         })

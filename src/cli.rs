@@ -24,16 +24,16 @@ pub(crate) struct RustyNuc {
         default_value = "20"
     )]
     pub(crate) quality: u8,
-    #[structopt(long, help = "Maximum pileup depth to use", default_value = "200")]
+    #[structopt(long, help = "Maximum pileup depth to use", default_value = "400")]
     pub(crate) max_depth: u32,
     #[structopt(
         long,
         help = "Significance threshold for Fisher's test",
-        default_value = "0.1"
+        default_value = "0.05"
     )]
     pub(crate) fisher_sig: f64,
-    #[structopt(long, help = "FDR threshold", default_value = "0.1")]
-    pub(crate) alpha: f64,
+    #[structopt(long, help = "FDR threshold", default_value = "0.2")]
+    pub(crate) alpha: f32,
     #[structopt(short, long, help = "Specific position to investigate")]
     pub(crate) positions: Option<Vec<u32>>,
     #[structopt(
