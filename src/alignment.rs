@@ -76,6 +76,7 @@ impl OxoPileup {
         }
     }
 
+    /// Returns the counts of A, C, G and T
     pub fn nuc_counts(&self, read_type: ReadType) -> Vec<u32> {
         crate::NUCLEOTIDES
             .iter()
@@ -86,7 +87,8 @@ impl OxoPileup {
             .collect::<Vec<u32>>()
     }
 
-    pub fn is_ref_g_or_c(&self) -> Option<bool> {
+    /// Checks if the base in the reference, if available, is G/C (IUPAC S)
+    pub fn is_iupac_s(&self) -> Option<bool> {
         match self.ref_nuc {
             Some(b'G') | Some(b'C') => Some(true),
             None => None,
@@ -94,6 +96,17 @@ impl OxoPileup {
         }
     }
 
+    /// Checks if the base in the reference, if available, is G/C (IUPAC S)
+    pub fn occurence_sufficient(&self, min_count: u32) -> bool {
+        self.nuc_counts(ReadType::FF)
+            .into_iter()
+            .zip(self.nuc_counts(ReadType::FR).into_iter())
+            .filter(|(ff_count, fr_count)| *ff_count > min_count || *fr_count > min_count)
+            .count()
+            > 1
+    }
+
+    /// Checks if there are more than one nucleotides appearing at 0 or more counts
     pub fn is_monomorphic(&self) -> bool {
         let ff_monomorphic = self
             .nuc_counts(ReadType::FF)
@@ -237,7 +250,7 @@ impl OxoPileup {
             self.ref_pos,
             self.ref_pos + 1,
             name,
-            -10.0 * (self.min_p_value()?.log10()),
+            -(self.min_p_value()?.log10()),
             "*",
             self.to_string()?,
         ))

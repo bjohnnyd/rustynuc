@@ -72,13 +72,13 @@ fn main() -> Result<()> {
         if update {
             let oxo = OxoPileup::new(
                 pileup,
-                Some(opt.min_number_variant),
+                Some(opt.min_reads),
                 opt.quality,
                 opt.pseudocount,
                 seq,
             );
 
-            if !oxo.is_monomorphic() {
+            if !oxo.is_monomorphic() && oxo.occurence_sufficient(opt.min_reads) {
                 id_map.insert(oxo.ref_id, seq_name);
                 oxo_pileups.push(oxo);
             }

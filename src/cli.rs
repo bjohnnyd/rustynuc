@@ -13,10 +13,10 @@ pub(crate) struct RustyNuc {
     #[structopt(
         short,
         long,
-        help = "Alignments to correct for possible oxo-g damage",
-        default_value = "2"
+        help = "Minimum number of aligned reads in ff or fr orientation for a position to be considered",
+        default_value = "4"
     )]
-    pub(crate) min_number_variant: u32,
+    pub(crate) min_reads: u32,
     #[structopt(
         short,
         long,
