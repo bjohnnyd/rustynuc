@@ -8,13 +8,13 @@ type Result<T> = std::result::Result<T, Error>;
 #[derive(Debug, Eq, PartialEq)]
 /// Contains summary of a pileup split into
 /// `first in pair` and `second in pair`.
-/// Contains helper functions for determining likelihood of
-/// reads containing oxo damage
+/// Contains helper functions for determining likelihood of reads containing oxo damage
 #[allow(missing_docs)]
 pub struct OxoPileup {
     pub ref_id: u32,
     pub ref_depth: u32,
     pub ref_pos: u32,
+    pub ref_nuc: Option<u8>,
     pub ff_count: NucleotideCount,
     pub fr_count: NucleotideCount,
     pub min_count: Option<u32>,
@@ -27,11 +27,21 @@ pub struct NucleotideCount(pub HashMap<u8, u32>);
 
 impl OxoPileup {
     /// Creates a pileup summary in terms of `F1R2` and `F2R1`
-    pub fn new(pileup: Pileup, min_count: Option<u32>, min_qual: u8, pseudocount: bool) -> Self {
+    pub fn new<T: AsRef<[u8]>>(
+        pileup: Pileup,
+        min_count: Option<u32>,
+        min_qual: u8,
+        pseudocount: bool,
+        seq: Option<T>,
+    ) -> Self {
         let ref_id = pileup.tid();
         let ref_depth = pileup.depth();
         let ref_pos = pileup.pos();
         let pseudocount = if pseudocount { 1 } else { 0 };
+        let ref_nuc = match seq {
+            Some(seq) => Some(seq.as_ref()[ref_pos as usize]),
+            None => None,
+        };
 
         let mut ff_count = NucleotideCount(HashMap::new());
         let mut fr_count = NucleotideCount(HashMap::new());
@@ -58,10 +68,48 @@ impl OxoPileup {
             ref_id,
             ref_depth,
             ref_pos,
+            ref_nuc,
             ff_count,
             fr_count,
             min_count,
             pseudocount,
+        }
+    }
+
+    pub fn nuc_counts(&self, read_type: ReadType) -> Vec<u32> {
+        crate::NUCLEOTIDES
+            .iter()
+            .map(|nuc| match read_type {
+                ReadType::FF => *self.ff_count.0.get(nuc).unwrap_or(&self.pseudocount),
+                ReadType::FR => *self.fr_count.0.get(nuc).unwrap_or(&self.pseudocount),
+            })
+            .collect::<Vec<u32>>()
+    }
+
+    pub fn is_ref_g_or_c(&self) -> Option<bool> {
+        match self.ref_nuc {
+            Some(b'G') | Some(b'C') => Some(true),
+            None => None,
+            _ => Some(false),
+        }
+    }
+
+    pub fn is_monomorphic(&self) -> bool {
+        let ff_monomorphic = self
+            .nuc_counts(ReadType::FF)
+            .into_iter()
+            .filter(|count| *count > 0)
+            .count()
+            <= 1;
+
+        if ff_monomorphic {
+            self.nuc_counts(ReadType::FR)
+                .into_iter()
+                .filter(|count| *count > 0)
+                .count()
+                <= 1
+        } else {
+            false
         }
     }
 
@@ -70,15 +118,8 @@ impl OxoPileup {
     // TODO: This should return p-value and then needs to be corrected by FDR(order first and then just threshold) or Bonferroni
     // (stricter)
     pub fn is_imbalanced(&self, sig: f64) -> Result<bool> {
-        let ff_nuc_counts = crate::NUCLEOTIDES
-            .iter()
-            .map(|nuc| *self.ff_count.0.get(nuc).unwrap_or(&self.pseudocount))
-            .collect::<Vec<u32>>();
-
-        let fr_nuc_counts = crate::NUCLEOTIDES
-            .iter()
-            .map(|nuc| *self.fr_count.0.get(nuc).unwrap_or(&self.pseudocount))
-            .collect::<Vec<u32>>();
+        let ff_nuc_counts = self.nuc_counts(ReadType::FF);
+        let fr_nuc_counts = self.nuc_counts(ReadType::FR);
 
         let ac_counts = [
             ff_nuc_counts[0],
@@ -122,15 +163,8 @@ impl OxoPileup {
             _ => return Err(Error::IncorrectNuc(nuc.to_string())),
         };
 
-        let ff_nuc_counts = crate::NUCLEOTIDES
-            .iter()
-            .map(|nuc| *self.ff_count.0.get(nuc).unwrap_or(&self.pseudocount))
-            .collect::<Vec<u32>>();
-
-        let fr_nuc_counts = crate::NUCLEOTIDES
-            .iter()
-            .map(|nuc| *self.fr_count.0.get(nuc).unwrap_or(&self.pseudocount))
-            .collect::<Vec<u32>>();
+        let ff_nuc_counts = self.nuc_counts(ReadType::FF);
+        let fr_nuc_counts = self.nuc_counts(ReadType::FR);
 
         let counts = [
             ff_nuc_counts[idx],
@@ -157,13 +191,17 @@ impl OxoPileup {
 
     /// Crates a string representation of the OxoPileup summary
     fn to_string(&self) -> Result<String> {
-        let mut summary = format!("{}", self.ref_depth);
-        for nuc in crate::NUCLEOTIDES.iter() {
-            let ff_count = self.ff_count.0.get(nuc).unwrap_or(&0_u32);
-            let fr_count = self.fr_count.0.get(nuc).unwrap_or(&0_u32);
-
-            summary.push_str(&format!("\t{}:{}", ff_count, fr_count,));
-        }
+        let summary = self
+            .nuc_counts(ReadType::FF)
+            .iter()
+            .zip(self.nuc_counts(ReadType::FR))
+            .fold(
+                format!("{}", self.ref_depth),
+                |mut summary, (ff_count, fr_count)| {
+                    summary.push_str(&format!("\t{}:{}", ff_count, fr_count,));
+                    summary
+                },
+            );
 
         Ok(format!(
             "{}\t{}\t{}",
@@ -181,15 +219,33 @@ impl OxoPileup {
             },
             None => format!("{}", self.ref_id),
         };
+
+        let name = match self.ref_nuc {
+            Some(nuc) => format!(
+                "{}_{}_{}_{}",
+                &chrom,
+                nuc as char,
+                self.ref_pos,
+                self.ref_pos + 1
+            ),
+            _ => format!("{}_{}_{}", &chrom, self.ref_pos, self.ref_pos + 1),
+        };
+
         Ok(format!(
             "{}\t{}\t{}\t{}\t{}\t{}\t{}",
             &chrom,
             self.ref_pos,
             self.ref_pos + 1,
-            format!("{}_{}_{}", &chrom, self.ref_pos, self.ref_pos + 1),
+            name,
             -(self.min_p_value()?.log10()),
             "*",
             self.to_string()?,
         ))
     }
+}
+
+#[derive(Debug, Eq, PartialEq)]
+pub enum ReadType {
+    FR,
+    FF,
 }

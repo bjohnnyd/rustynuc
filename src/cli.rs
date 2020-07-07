@@ -56,6 +56,12 @@ pub(crate) struct RustyNuc {
         help = "Whether to use pseudocounts (adds +1 to all counts) when calculating statistics"
     )]
     pub(crate) pseudocount: bool,
+    #[structopt(
+        short,
+        long,
+        help = "Include track line (for correct visualization with IGV)"
+    )]
+    pub(crate) with_track_line: bool,
 }
 
 impl RustyNuc {

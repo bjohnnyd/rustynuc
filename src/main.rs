@@ -17,6 +17,8 @@ use structopt::StructOpt;
 
 /// Nucleotide alphabet used
 pub const NUCLEOTIDES: [u8; 4] = [b'A', b'C', b'G', b'T'];
+/// Defualt visualization settings for track line
+pub const TRACK_LINE: &str = "#coords 0";
 
 type Result<T> = std::result::Result<T, crate::error::Error>;
 
@@ -46,20 +48,31 @@ fn main() -> Result<()> {
         seq_map = Some(create_seq_map(fasta_rdr)?);
     }
 
-    // TODO: Can create a function or method to, if reference is provided, exclude non G/C
-    // positions (in case of C.beijerinickii this reduces the number of tests by up to 70%), hence
-    // faster and lower adj. pval
     for p in pileups {
         let pileup = p?;
         let seq_name = String::from_utf8(header.tid2name(pileup.tid()).to_vec())?;
+        let seq = match seq_map {
+            Some(ref seq_map) => seq_map.get(&seq_name),
+            None => None,
+        };
+
         let oxo = OxoPileup::new(
             pileup,
             Some(opt.min_number_variant),
             opt.quality,
             opt.pseudocount,
+            seq,
         );
-        id_map.insert(oxo.ref_id, seq_name);
-        oxo_pileups.push(oxo);
+
+        if !oxo.is_monomorphic() {
+            match oxo.is_ref_g_or_c() {
+                Some(true) | None => {
+                    id_map.insert(oxo.ref_id, seq_name);
+                    oxo_pileups.push(oxo);
+                }
+                _ => {}
+            }
+        }
     }
 
     // NOTE: If wanting ot use custom error will need to collect into tuple of (i, i.pval) but
@@ -73,6 +86,9 @@ fn main() -> Result<()> {
 
     let m = oxo_pileups.len();
 
+    if opt.with_track_line {
+        println!("{}", TRACK_LINE);
+    }
     let _ = oxo_pileups
         .par_iter()
         .enumerate()
