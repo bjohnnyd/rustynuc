@@ -56,6 +56,8 @@ fn main() -> Result<()> {
             None => None,
         };
 
+        // TODO: Move check of reference nucleotide here so the creation and counting does not need
+        // to happen at all
         let oxo = OxoPileup::new(
             pileup,
             Some(opt.min_number_variant),
