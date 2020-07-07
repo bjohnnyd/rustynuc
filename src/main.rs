@@ -46,18 +46,19 @@ fn main() -> Result<()> {
         seq_map = Some(create_seq_map(fasta_rdr)?);
     }
 
+    // TODO: Can create a function or method to, if reference is provided, exclude non G/C
+    // positions (in case of C.beijerinickii this reduces the number of tests by up to 70%), hence
+    // faster and lower adj. pval
     for p in pileups {
         let pileup = p?;
+        let seq_name = String::from_utf8(header.tid2name(pileup.tid()).to_vec())?;
         let oxo = OxoPileup::new(
             pileup,
             Some(opt.min_number_variant),
             opt.quality,
             opt.pseudocount,
         );
-        id_map.insert(
-            oxo.ref_id,
-            String::from_utf8(header.tid2name(oxo.ref_id).to_vec())?,
-        );
+        id_map.insert(oxo.ref_id, seq_name);
         oxo_pileups.push(oxo);
     }
 
