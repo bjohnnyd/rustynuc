@@ -237,7 +237,7 @@ impl OxoPileup {
             self.ref_pos,
             self.ref_pos + 1,
             name,
-            -(self.min_p_value()?.log10()),
+            -10.0 * (self.min_p_value()?.log10()),
             "*",
             self.to_string()?,
         ))

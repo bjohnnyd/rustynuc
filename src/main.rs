@@ -50,29 +50,37 @@ fn main() -> Result<()> {
 
     for p in pileups {
         let pileup = p?;
+        let pos = pileup.pos() as usize;
         let seq_name = String::from_utf8(header.tid2name(pileup.tid()).to_vec())?;
         let seq = match seq_map {
             Some(ref seq_map) => seq_map.get(&seq_name),
             None => None,
         };
 
-        // TODO: Move check of reference nucleotide here so the creation and counting does not need
-        // to happen at all
-        let oxo = OxoPileup::new(
-            pileup,
-            Some(opt.min_number_variant),
-            opt.quality,
-            opt.pseudocount,
-            seq,
-        );
-
-        if !oxo.is_monomorphic() {
-            match oxo.is_ref_g_or_c() {
-                Some(true) | None => {
-                    id_map.insert(oxo.ref_id, seq_name);
-                    oxo_pileups.push(oxo);
+        let update = match seq {
+            Some(seq) => {
+                if pos > seq.len() {
+                    warn!("Reference sequence is shorter than BAM alignment positions");
+                    true
+                } else {
+                    is_s(seq.as_bytes(), pos)
                 }
-                _ => {}
+            }
+            None => true,
+        };
+
+        if update {
+            let oxo = OxoPileup::new(
+                pileup,
+                Some(opt.min_number_variant),
+                opt.quality,
+                opt.pseudocount,
+                seq,
+            );
+
+            if !oxo.is_monomorphic() {
+                id_map.insert(oxo.ref_id, seq_name);
+                oxo_pileups.push(oxo);
             }
         }
     }
@@ -154,5 +162,12 @@ fn get_seq_context(seq: &str, pos: u32) -> String {
             format!("{}X", &seq[(last_idx - 1)..(last_idx + 1)])
         }
         i => format!("{}", &seq[(i - 1) as usize..(i + 2) as usize]),
+    }
+}
+
+fn is_s(seq: &[u8], pos: usize) -> bool {
+    match seq[pos] {
+        b'G' | b'C' => true,
+        _ => false,
     }
 }
