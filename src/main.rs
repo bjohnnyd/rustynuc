@@ -107,30 +107,7 @@ fn main() -> Result<()> {
             let qval = (alpha * rank as f32) / m as f32;
             let sig = if pval < qval as f64 { 1 } else { 0 };
             let corrected = format!("{}\t{}", qval, sig);
-
-            if let Some(ref reference) = seq_map {
-                let seq_name = id_map.get(&p.ref_id).unwrap();
-                let seq = reference.get(seq_name);
-                match &seq {
-                    Some(seq) => {
-                        println!(
-                            "{}\t{}\t{}",
-                            p.to_bed_entry(Some(&id_map))?,
-                            get_seq_context(seq, p.ref_pos),
-                            corrected
-                        );
-                    }
-                    None => {
-                        warn!(
-                        "The reference provided does not have record present in the bam file, {}",
-                        &seq_name
-                    );
-                        println!("{}\t{}", p.to_bed_entry(Some(&id_map))?, corrected);
-                    }
-                }
-            } else {
-                println!("{}\t{}", p.to_bed_entry(Some(&id_map))?, corrected);
-            }
+            println!("{}\t{}\t{}", p.to_bed_entry(Some(&id_map))?, qval, sig);
             Ok(())
         })
         .collect::<Result<Vec<()>>>();

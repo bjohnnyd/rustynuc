@@ -14,7 +14,7 @@ pub struct OxoPileup {
     pub ref_id: u32,
     pub ref_depth: u32,
     pub ref_pos: u32,
-    pub ref_nuc: Option<u8>,
+    pub context: Option<[u8; 3]>,
     pub ff_count: NucleotideCount,
     pub fr_count: NucleotideCount,
     pub min_count: Option<u32>,
@@ -38,8 +38,8 @@ impl OxoPileup {
         let ref_depth = pileup.depth();
         let ref_pos = pileup.pos();
         let pseudocount = if pseudocount { 1 } else { 0 };
-        let ref_nuc = match seq {
-            Some(seq) => Some(seq.as_ref()[ref_pos as usize]),
+        let context = match seq {
+            Some(seq) => Some(get_seq_context(seq.as_ref(), ref_pos)),
             None => None,
         };
 
@@ -68,7 +68,7 @@ impl OxoPileup {
             ref_id,
             ref_depth,
             ref_pos,
-            ref_nuc,
+            context,
             ff_count,
             fr_count,
             min_count,
@@ -89,10 +89,12 @@ impl OxoPileup {
 
     /// Checks if the base in the reference, if available, is G/C (IUPAC S)
     pub fn is_iupac_s(&self) -> Option<bool> {
-        match self.ref_nuc {
-            Some(b'G') | Some(b'C') => Some(true),
+        match self.context {
+            Some(context) => match context[1] {
+                b'G' | b'C' => Some(true),
+                _ => Some(false),
+            },
             None => None,
-            _ => Some(false),
         }
     }
 
@@ -225,6 +227,7 @@ impl OxoPileup {
     }
 
     pub fn to_bed_entry(&self, seqid_map: Option<&HashMap<u32, String>>) -> Result<String> {
+        let mut seq = String::from("");
         let chrom = match seqid_map {
             Some(seqid_map) => match seqid_map.get(&self.ref_id) {
                 Some(name) => name.to_string(),
@@ -233,19 +236,23 @@ impl OxoPileup {
             None => format!("{}", self.ref_id),
         };
 
-        let name = match self.ref_nuc {
-            Some(nuc) => format!(
-                "{}_{}_{}_{}",
-                &chrom,
-                nuc as char,
-                self.ref_pos,
-                self.ref_pos + 1
-            ),
+        let name = match self.context {
+            Some(context) => {
+                seq = format!("\t{}", String::from_utf8(context.to_vec())?);
+
+                format!(
+                    "{}_{}_{}_{}",
+                    &chrom,
+                    context[1] as char,
+                    self.ref_pos,
+                    self.ref_pos + 1
+                )
+            }
             _ => format!("{}_{}_{}", &chrom, self.ref_pos, self.ref_pos + 1),
         };
 
         Ok(format!(
-            "{}\t{}\t{}\t{}\t{}\t{}\t{}",
+            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
             &chrom,
             self.ref_pos,
             self.ref_pos + 1,
@@ -253,6 +260,7 @@ impl OxoPileup {
             -(self.min_p_value()?.log10()),
             "*",
             self.to_string()?,
+            seq,
         ))
     }
 }
@@ -261,4 +269,23 @@ impl OxoPileup {
 pub enum ReadType {
     FR,
     FF,
+}
+
+fn get_seq_context(seq: &[u8], pos: u32) -> [u8; 3] {
+    let mut context = [0; 3];
+    let idx = (seq.len() - 1) as u32;
+    match pos {
+        0 => {
+            context[0] = b'X';
+            context[1..3].copy_from_slice(&seq[0..2])
+        }
+        last_idx if last_idx == idx => {
+            let last_idx = last_idx as usize;
+            context[2] = b'X';
+            context[0..2].copy_from_slice(&seq[(last_idx - 1)..(last_idx + 1)]);
+        }
+        i => context.copy_from_slice(&seq[(i - 1) as usize..(i + 2) as usize]),
+    }
+
+    context
 }
