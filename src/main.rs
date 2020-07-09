@@ -40,7 +40,6 @@ fn main() -> Result<()> {
 
     let alpha = opt.alpha;
     let mut seq_map = None;
-    let mut id_map = HashMap::<u32, String>::new();
 
     if let Some(path) = opt.reference {
         let (rdr, _) = niffler::from_path(path)?;
@@ -71,6 +70,7 @@ fn main() -> Result<()> {
 
         if update {
             let oxo = OxoPileup::new(
+                seq_name,
                 pileup,
                 Some(opt.min_reads),
                 opt.quality,
@@ -78,8 +78,9 @@ fn main() -> Result<()> {
                 seq,
             );
 
-            if !oxo.is_monomorphic() && oxo.occurence_sufficient(opt.min_reads) {
-                id_map.insert(oxo.ref_id, seq_name);
+            if opt.all {
+                oxo_pileups.push(oxo);
+            } else if !oxo.is_monomorphic() && oxo.occurence_sufficient(opt.min_reads) {
                 oxo_pileups.push(oxo);
             }
         }
@@ -107,7 +108,7 @@ fn main() -> Result<()> {
             let qval = (alpha * rank as f32) / m as f32;
             let sig = if pval < qval as f64 { 1 } else { 0 };
             let corrected = format!("{}\t{}", qval, sig);
-            println!("{}\t{}\t{}", p.to_bed_entry(Some(&id_map))?, qval, sig);
+            println!("{}\t{}\t{}", p.to_bed_entry()?, qval, sig);
             Ok(())
         })
         .collect::<Result<Vec<()>>>();

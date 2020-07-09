@@ -34,8 +34,6 @@ pub(crate) struct RustyNuc {
     pub(crate) fisher_sig: f64,
     #[structopt(long, help = "FDR threshold", default_value = "0.2")]
     pub(crate) alpha: f32,
-    #[structopt(short, long, help = "Specific position to investigate")]
-    pub(crate) positions: Option<Vec<u32>>,
     #[structopt(
         short,
         long,

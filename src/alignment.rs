@@ -11,7 +11,7 @@ type Result<T> = std::result::Result<T, Error>;
 /// Contains helper functions for determining likelihood of reads containing oxo damage
 #[allow(missing_docs)]
 pub struct OxoPileup {
-    pub ref_id: u32,
+    pub chrom: String,
     pub ref_depth: u32,
     pub ref_pos: u32,
     pub context: Option<[u8; 3]>,
@@ -28,13 +28,13 @@ pub struct NucleotideCount(pub HashMap<u8, u32>);
 impl OxoPileup {
     /// Creates a pileup summary in terms of `F1R2` and `F2R1`
     pub fn new<T: AsRef<[u8]>>(
+        chrom: String,
         pileup: Pileup,
         min_count: Option<u32>,
         min_qual: u8,
         pseudocount: bool,
         seq: Option<T>,
     ) -> Self {
-        let ref_id = pileup.tid();
         let ref_depth = pileup.depth();
         let ref_pos = pileup.pos();
         let pseudocount = if pseudocount { 1 } else { 0 };
@@ -65,7 +65,7 @@ impl OxoPileup {
         }
 
         Self {
-            ref_id,
+            chrom,
             ref_depth,
             ref_pos,
             context,
@@ -213,7 +213,11 @@ impl OxoPileup {
             .fold(
                 format!("{}", self.ref_depth),
                 |mut summary, (ff_count, fr_count)| {
-                    summary.push_str(&format!("\t{}:{}", ff_count, fr_count,));
+                    summary.push_str(&format!(
+                        "\t{}:{}",
+                        ff_count - self.pseudocount,
+                        fr_count - self.pseudocount,
+                    ));
                     summary
                 },
             );
@@ -226,15 +230,8 @@ impl OxoPileup {
         ))
     }
 
-    pub fn to_bed_entry(&self, seqid_map: Option<&HashMap<u32, String>>) -> Result<String> {
+    pub fn to_bed_entry(&self) -> Result<String> {
         let mut seq = String::from("");
-        let chrom = match seqid_map {
-            Some(seqid_map) => match seqid_map.get(&self.ref_id) {
-                Some(name) => name.to_string(),
-                None => format!("{}", self.ref_id),
-            },
-            None => format!("{}", self.ref_id),
-        };
 
         let name = match self.context {
             Some(context) => {
@@ -242,18 +239,18 @@ impl OxoPileup {
 
                 format!(
                     "{}_{}_{}_{}",
-                    &chrom,
+                    &self.chrom,
                     context[1] as char,
                     self.ref_pos,
                     self.ref_pos + 1
                 )
             }
-            _ => format!("{}_{}_{}", &chrom, self.ref_pos, self.ref_pos + 1),
+            _ => format!("{}_{}_{}", &self.chrom, self.ref_pos, self.ref_pos + 1),
         };
 
         Ok(format!(
             "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
-            &chrom,
+            &self.chrom,
             self.ref_pos,
             self.ref_pos + 1,
             name,
