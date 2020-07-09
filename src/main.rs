@@ -1,9 +1,7 @@
 #![warn(missing_debug_implementations, rust_2018_idioms, missing_docs)]
 #![allow(dead_code, unused_variables)]
-//TODO: need to trim and map Sub-0-Rep-5 from run3 and compare to current
-//TODO: Need to probably keep fishers test but deal differently and instead of FDR
-//      make OR or similar, like GATK
-//! QC tool for assesment of likelihood of oxo-G related variation in reads.  
+
+//! QC tool for assesment of likelihood of 8-oxoG related variation.  
 mod alignment;
 mod cli;
 mod error;
@@ -86,8 +84,6 @@ fn main() -> Result<()> {
         }
     }
 
-    // NOTE: If wanting ot use custom error will need to collect into tuple of (i, i.pval) but
-    // could do this in parallel
     oxo_pileups.sort_by(|a, b| {
         a.min_p_value()
             .expect("Could not calculate min pval")
@@ -116,7 +112,6 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-// TODO: Cannot return fasta::Record to share between threads
 fn create_seq_map<T: std::io::Read>(
     rdr: bio::io::fasta::Reader<T>,
 ) -> Result<HashMap<String, String>> {

@@ -6,9 +6,8 @@ use std::collections::HashMap;
 type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug, Eq, PartialEq)]
-/// Contains summary of a pileup split into
-/// `first in pair` and `second in pair`.
-/// Contains helper functions for determining likelihood of reads containing oxo damage
+/// Contains summary of a pileup split into `first in pair` and `second in pair`.
+/// Contains helper functions for determining likelihood of reads containing oxo damage.
 #[allow(missing_docs)]
 pub struct OxoPileup {
     pub chrom: String,
@@ -98,7 +97,7 @@ impl OxoPileup {
         }
     }
 
-    /// Checks if the base in the reference, if available, is G/C (IUPAC S)
+    /// Checks if the coverage is above the supplied minimum
     pub fn occurence_sufficient(&self, min_count: u32) -> bool {
         self.nuc_counts(ReadType::FF)
             .into_iter()
@@ -108,7 +107,7 @@ impl OxoPileup {
             > 1
     }
 
-    /// Checks if there are more than one nucleotides appearing at 0 or more counts
+    /// Checks if there is more than one nucleotide appearing at 0 or more counts
     pub fn is_monomorphic(&self) -> bool {
         let ff_monomorphic = self
             .nuc_counts(ReadType::FF)
@@ -130,8 +129,6 @@ impl OxoPileup {
 
     /// Checks if there are significant differences between nucleotides
     /// on ff v fr
-    // TODO: This should return p-value and then needs to be corrected by FDR(order first and then just threshold) or Bonferroni
-    // (stricter)
     pub fn is_imbalanced(&self, sig: f64) -> Result<bool> {
         let ff_nuc_counts = self.nuc_counts(ReadType::FF);
         let fr_nuc_counts = self.nuc_counts(ReadType::FR);
@@ -154,7 +151,6 @@ impl OxoPileup {
         let p_gt = fishers_exact(&gt_counts)?;
 
         let (ac_sufficient, gt_sufficient) = match self.min_count {
-            // NOTE: I think only count for alt is necessary (i.e A or T)
             Some(count) => {
                 let ac_sufficient = (ac_counts[0] > count || ac_counts[2] > count)
                     && (ac_counts[1] > count || ac_counts[3] > count);
@@ -230,6 +226,7 @@ impl OxoPileup {
         ))
     }
 
+    /// Convertes the pileups summary into a bed entry
     pub fn to_bed_entry(&self) -> Result<String> {
         let mut seq = String::from("");
 
@@ -268,6 +265,8 @@ pub enum ReadType {
     FF,
 }
 
+/// Returns the 3-mer sequence context with the pileup in the middle. For pileup at zero
+/// the first base is labeled `X` and for pileup at end the last
 fn get_seq_context(seq: &[u8], pos: u32) -> [u8; 3] {
     let mut context = [0; 3];
     let idx = (seq.len() - 1) as u32;
