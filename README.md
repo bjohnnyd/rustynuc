@@ -21,10 +21,10 @@ To compile from source rustup is required and can be obtained [HERE](https://rus
 $ git clone https://github.com/bjohnnyd/rustynuc.git && cd rustynuc && cargo build --release 
 ```
 
-The compiled binary can then be ran using:
-
+### Cargo 
+If you have cargo installed or have installed [RUSTUP](https://rustup.rs/) you can install the tool directly from github
 ``` bash
-$ ./target/release/rustynuc -h
+$ cargo install --git https://github.com/bjohnnyd/rustynuc
 ```
 
 All releases and associated binaries and archives are accessible under [Releases](https://github.com/bjohnnyd/rustynuc/releases).
@@ -71,8 +71,8 @@ Output is a BED file with the following info:
 1. Chromosome
 2. Start
 3. End
-4. Name (format is `chromosome_start_end` or if reference is provided `chromosome_base_start_end`
-5. -log10 of p-value (p-value is the smalles of the A/C and G/T )
+4. Name (format is `<chromosome>_<start>_<end>` or if reference is provided `<chromosome>_<base>_<start>_<end>`
+5. -log10 of p-value (p-value is the smallest of the A/C and G/T )
 6. Strand
 7. Depth
 8. Adenine FF:FR counts
