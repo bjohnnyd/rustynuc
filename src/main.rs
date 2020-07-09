@@ -9,7 +9,7 @@ mod cli;
 mod error;
 
 use crate::alignment::OxoPileup;
-use log::warn;
+use log::error;
 use rayon::prelude::*;
 use rust_htslib::{bam, bam::Read};
 use std::collections::HashMap;
@@ -58,9 +58,9 @@ fn main() -> Result<()> {
 
         let update = match seq {
             Some(seq) => {
-                if pos > seq.len() {
-                    warn!("Reference sequence is shorter than BAM alignment positions");
-                    true
+                if pos >= seq.len() {
+                    error!("Reference sequence is shorter than BAM alignment positions");
+                    std::process::exit(1)
                 } else {
                     is_s(seq.as_bytes(), pos)
                 }

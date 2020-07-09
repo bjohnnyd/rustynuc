@@ -86,7 +86,7 @@ Output is a BED file with the following info:
 15/16. Significant at set FDR value (1 if yes, 0 if not)
 ```
 
-To get only positions with p-value below 0.05 the results can be piped through awk `rustynuc <path/to/bam> | awk '$12 < 0.05 || $13 < 0.05'`.
+To get only positions with p-value below 0.05 the results can be piped through awk `rustynuc -r tests/input/ref.fa.gz tests/alignments/oxog.bam | awk '$12 < 0.05 || $13 < 0.05'`.
 
 
 ## Authors and Citation
@@ -113,4 +113,3 @@ The MIT License (MIT). Please see [License File](LICENSE.md) for more informatio
 [osx-zip]: https://github.com/bjohnnyd/rustynuc/releases/latest/download/x86_64-apple-darwin.zip
 [windows-tar]: https://github.com/bjohnnyd/rustynuc/releases/latest/download/x86_64-pc-windows-gnu.tar.gz
 [windows-zip]: https://github.com/bjohnnyd/rustynuc/releases/latest/download/x86_64-pc-windows-gnu.zip
-
