@@ -11,15 +11,19 @@ Tool to calculate the likelihood of 8-oxoG damage based on alignment characteris
 
 ### Binary
 
-The simplest way to install is using the precompiled binaries provided.
+Precompiled binaries are provided below:
 
-The simplest way to install is using the precompiled binaries provided below:
+| ![picture](static/64px-Tux.png) | ![picture](static/64px-MacOS_logo.png)  |
+| :-----------------------------: | :-------------------------------------: |
+| [TAR][linux-tar] | [TAR][osx-tar]  |
+| [ZIP][linux-zip] | [ZIP][osx-zip]  |
 
-| ![picture](static/64px-Tux.png) | ![picture](static/64px-MacOS_logo.png)  | ![picture](static/64px-Windows_logo_2012.png) |
-| :-----------------------------: | :-------------------------------------: |:--------------------------------------------: |
-| [TAR][linux-tar] | [TAR][osx-tar]  | [TAR][windows-tar] |
-| [ZIP][linux-zip] | [ZIP][osx-zip]  | [ZIP][windows-zip] |
+### Cargo 
 
+If you have cargo installed or have installed [RUSTUP](https://rustup.rs/), you can install directly from github
+``` bash
+$ cargo install --git https://github.com/bjohnnyd/rustynuc
+```
 
 ### Build 
 
@@ -27,12 +31,6 @@ To compile from source rustup is required and can be obtained [HERE](https://rus
 
 ```bash
 $ git clone https://github.com/bjohnnyd/rustynuc.git && cd rustynuc && cargo build --release 
-```
-
-### Cargo 
-If you have cargo installed or have installed [RUSTUP](https://rustup.rs/) you can install the tool directly from github
-``` bash
-$ cargo install --git https://github.com/bjohnnyd/rustynuc
 ```
 
 All releases and associated binaries and archives are accessible under [Releases](https://github.com/bjohnnyd/rustynuc/releases).
@@ -99,7 +97,7 @@ To get only positions with p-value below 0.05 the results can be piped through a
 
 ## Authors and Citation
 
-- [Bisrat Johnathan Debebe][link-author]
+- [Johnny Debebe][link-author]
 
 ## License
 
