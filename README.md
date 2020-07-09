@@ -81,9 +81,13 @@ Output is a BED file with the following info:
 11. Thymine FF:FR counts
 12. A/C two-sided p-value Fisher's Exact Test
 13. G/T two-sided p-value Fisher's Exact Test
-14. adj. pvalue 
-15. Significant at set FDR value (1 if yes, 0 if not)
+(14). Sequnce Context (if reference provided)
+14/15. adj. pvalue 
+15/16. Significant at set FDR value (1 if yes, 0 if not)
 ```
+
+To get only positions with p-value below 0.05 the results can be piped through awk `rustynuc <path/to/bam> | awk '$12 < 0.05 || $13 < 0.05'`.
+
 
 ## Authors and Citation
 
