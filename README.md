@@ -13,6 +13,14 @@ Tool to calculate the likelihood of 8-oxoG damage based on alignment characteris
 
 The simplest way to install is using the precompiled binaries provided.
 
+The simplest way to install is using the precompiled binaries provided below:
+
+| ![picture](static/64px-Tux.png) | ![picture](static/64px-MacOS_logo.png)  | ![picture](static/64px-Windows_logo_2012.png) |
+| :-----------------------------: | :-------------------------------------: |:--------------------------------------------: |
+| [TAR][linux-tar] | [TAR][osx-tar]  | [TAR][windows-tar] |
+| [ZIP][linux-zip] | [ZIP][osx-zip]  | [ZIP][windows-zip] |
+
+
 ### Build 
 
 To compile from source rustup is required and can be obtained [HERE](https://rustup.rs/).  After installing rustup download the release archive file and build:
