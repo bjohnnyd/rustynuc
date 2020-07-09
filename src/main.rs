@@ -92,7 +92,7 @@ fn main() -> Result<()> {
         a.min_p_value()
             .expect("Could not calculate min pval")
             .partial_cmp(&b.min_p_value().expect("Could not calculate min pval"))
-            .expect("Could not compare the flot values")
+            .expect("Could not compare the float values")
     });
 
     let m = oxo_pileups.len();
@@ -129,18 +129,6 @@ fn create_seq_map<T: std::io::Read>(
         );
     }
     Ok(seq_map)
-}
-
-fn get_seq_context(seq: &str, pos: u32) -> String {
-    let idx = (seq.len() - 1) as u32;
-    match pos {
-        0 => format!("X{}", &seq[0..2]),
-        last_idx if last_idx == idx => {
-            let last_idx = last_idx as usize;
-            format!("{}X", &seq[(last_idx - 1)..(last_idx + 1)])
-        }
-        i => format!("{}", &seq[(i - 1) as usize..(i + 2) as usize]),
-    }
 }
 
 fn is_s(seq: &[u8], pos: usize) -> bool {
