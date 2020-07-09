@@ -43,7 +43,7 @@ pub(crate) struct RustyNuc {
     #[structopt(short, long, help = "Whether to just print results for all positions")]
     pub(crate) all: bool,
     #[structopt(
-        help = "Alignments to correct for possible oxo-g damage",
+        help = "Alignments to correct for possible 8-oxoG damage",
         required = true,
         parse(from_os_str)
     )]
