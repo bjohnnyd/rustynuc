@@ -2,7 +2,7 @@
 
 [![Release][ico-version]][link-version]
 [![Build Status][ico-travis]][link-travis]
-[![Software License][ico-license]](LICENSE.md)
+[![Software License][ico-license]](./LICENSE.md)
 
 
 Tool to calculate the likelihood of 8-oxoG damage based on alignment characteristics.
