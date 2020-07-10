@@ -5,7 +5,6 @@ use std::collections::HashMap;
 
 type Result<T> = std::result::Result<T, Error>;
 
-#[derive(Debug, Eq, PartialEq)]
 /// Contains summary of a pileup split into `first in pair` and `second in pair`.
 /// Contains helper functions for determining likelihood of reads containing oxo damage.
 #[allow(missing_docs)]
@@ -14,8 +13,8 @@ pub struct OxoPileup {
     pub ref_depth: u32,
     pub ref_pos: u32,
     pub context: Option<[u8; 3]>,
-    pub ff_count: NucleotideCount,
-    pub fr_count: NucleotideCount,
+    pub ff_count: [u32; 256],
+    pub fr_count: [u32; 256],
     pub min_count: Option<u32>,
     pub pseudocount: u32,
 }
@@ -42,8 +41,8 @@ impl OxoPileup {
             None => None,
         };
 
-        let mut ff_count = NucleotideCount(HashMap::new());
-        let mut fr_count = NucleotideCount(HashMap::new());
+        let mut ff_count = [pseudocount; 256];
+        let mut fr_count = [pseudocount; 256];
 
         for alignment in pileup.alignments() {
             if let Some(pos) = alignment.qpos() {
@@ -53,11 +52,9 @@ impl OxoPileup {
 
                 if record.is_first_in_template() && qual > min_qual {
                     if record.is_reverse() {
-                        let count = fr_count.0.entry(base).or_insert(pseudocount);
-                        *count += 1;
+                        fr_count[base as usize] += 1;
                     } else {
-                        let count = ff_count.0.entry(base).or_insert(pseudocount);
-                        *count += 1;
+                        ff_count[base as usize] += 1;
                     }
                 }
             }
@@ -80,8 +77,8 @@ impl OxoPileup {
         crate::NUCLEOTIDES
             .iter()
             .map(|nuc| match read_type {
-                ReadType::FF => *self.ff_count.0.get(nuc).unwrap_or(&self.pseudocount),
-                ReadType::FR => *self.fr_count.0.get(nuc).unwrap_or(&self.pseudocount),
+                ReadType::FF => self.ff_count[*nuc as usize] + self.ff_count[(*nuc + 32) as usize],
+                ReadType::FR => self.fr_count[*nuc as usize] + self.ff_count[(*nuc + 32) as usize],
             })
             .collect::<Vec<u32>>()
     }
@@ -90,7 +87,7 @@ impl OxoPileup {
     pub fn is_iupac_s(&self) -> Option<bool> {
         match self.context {
             Some(context) => match context[1] {
-                b'G' | b'C' => Some(true),
+                b'G' | b'C' | b'g' | b'c' => Some(true),
                 _ => Some(false),
             },
             None => None,
