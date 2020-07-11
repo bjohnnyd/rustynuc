@@ -41,8 +41,8 @@ impl OxoPileup {
             None => None,
         };
 
-        let mut ff_count = [pseudocount; 256];
-        let mut fr_count = [pseudocount; 256];
+        let mut ff_count = [0; 256];
+        let mut fr_count = [0; 256];
 
         for alignment in pileup.alignments() {
             if let Some(pos) = alignment.qpos() {
@@ -77,8 +77,16 @@ impl OxoPileup {
         crate::NUCLEOTIDES
             .iter()
             .map(|nuc| match read_type {
-                ReadType::FF => self.ff_count[*nuc as usize] + self.ff_count[(*nuc + 32) as usize],
-                ReadType::FR => self.fr_count[*nuc as usize] + self.ff_count[(*nuc + 32) as usize],
+                ReadType::FF => {
+                    self.ff_count[*nuc as usize]
+                        + self.ff_count[(*nuc + 32) as usize]
+                        + self.pseudocount
+                }
+                ReadType::FR => {
+                    self.fr_count[*nuc as usize]
+                        + self.ff_count[(*nuc + 32) as usize]
+                        + self.pseudocount
+                }
             })
             .collect::<Vec<u32>>()
     }
