@@ -67,7 +67,7 @@ OPTIONS:
     -t, --threads <threads>          Number of threads [default: 4]
 
 ARGS:
-    <bam>    Alignments to investigatecorrect for potential 8-oxoG damage
+    <bam>    Alignments to investigate for potential 8-oxoG damage
 ```
 ### Output
 

@@ -49,23 +49,8 @@ fn main() -> Result<()> {
 
     if let Some(ref path) = opt.bed {
         let (rdr, _) = niffler::from_path(path)?;
-        let mut bed_rdr = bio::io::bed::Reader::new(rdr);
-        for (i, record) in bed_rdr.records().enumerate() {
-            let record = record.or_else(|_| Err(crate::error::Error::BedRecordError(i + 1)))?;
-            let interval = Interval::new(std::ops::Range {
-                start: record.start(),
-                end: record.end(),
-            })
-            .or_else(|_| {
-                Err(crate::error::Error::IncorrectInterval(
-                    i,
-                    record.start(),
-                    record.end(),
-                ))
-            })?;
-            let regions = bed_map.entry(record.chrom().to_string()).or_default();
-            regions.push(interval);
-        }
+        let bed_rdr = bio::io::bed::Reader::new(rdr);
+        create_bed_map(bed_rdr, &mut bed_map)?;
     }
 
     'pileups: for p in pileups {
@@ -75,7 +60,10 @@ fn main() -> Result<()> {
         if !bed_map.is_empty() {
             match bed_map.get(&seq_name) {
                 Some(regions) => {
-                    if !regions.iter().any(|region| region.contains(&(pos as u64))) {
+                    if !regions
+                        .par_iter()
+                        .any(|region| region.contains(&(pos as u64)))
+                    {
                         continue 'pileups;
                     }
                 }
@@ -161,6 +149,29 @@ fn create_seq_map<T: std::io::Read>(
         );
     }
     Ok(seq_map)
+}
+
+fn create_bed_map<T: std::io::Read>(
+    mut rdr: bio::io::bed::Reader<T>,
+    map: &mut HashMap<String, Vec<Interval<u64>>>,
+) -> Result<()> {
+    for (i, record) in rdr.records().enumerate() {
+        let record = record.or_else(|_| Err(crate::error::Error::BedRecordError(i + 1)))?;
+        let interval = Interval::new(std::ops::Range {
+            start: record.start(),
+            end: record.end(),
+        })
+        .or_else(|_| {
+            Err(crate::error::Error::IncorrectInterval(
+                i,
+                record.start(),
+                record.end(),
+            ))
+        })?;
+        let regions = map.entry(record.chrom().to_string()).or_default();
+        regions.push(interval);
+    }
+    Ok(())
 }
 
 fn is_s(seq: &[u8], pos: usize) -> bool {
