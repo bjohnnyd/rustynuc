@@ -31,6 +31,7 @@ fn main() -> Result<()> {
         .or_else(|_| Err(crate::error::Error::ThreadError))?;
 
     let mut bam = bam::Reader::from_path(opt.bam)?;
+    bam.set_threads(opt.threads)?;
     let header = bam.header().clone();
 
     let mut pileups = bam.pileup();
@@ -126,7 +127,7 @@ fn main() -> Result<()> {
         .enumerate()
         .map(|(rank, p)| {
             let pval = p.min_p_value()?;
-            let qval = (alpha * rank as f32) / (2 * m) as f32;
+            let qval = (alpha * rank as f32) / m as f32;
             let sig = if pval < qval as f64 { 1 } else { 0 };
             let corrected = format!("{}\t{}", qval, sig);
             println!("{}\t{}\t{}", p.to_bed_entry()?, qval, sig);
