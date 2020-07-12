@@ -195,13 +195,17 @@ impl OxoPileup {
 
     /// Returns the smaller of the A/C and G/T two-tailed p.values
     pub fn min_p_value(&self) -> Result<f64> {
-        let ac = self.get_pval(b'A')?;
-        let gt = self.get_pval(b'G')?;
-
-        if ac < gt {
-            Ok(ac)
+        if let Some(context) = self.context {
+            self.get_pval(context[1])
         } else {
-            Ok(gt)
+            let ac = self.get_pval(b'A')?;
+            let gt = self.get_pval(b'G')?;
+
+            if ac < gt {
+                Ok(ac)
+            } else {
+                Ok(gt)
+            }
         }
     }
 

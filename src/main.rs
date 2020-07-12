@@ -39,7 +39,7 @@ fn main() -> Result<()> {
     let alpha = opt.alpha;
     let mut seq_map = None;
 
-    if let Some(path) = opt.reference {
+    if let Some(ref path) = opt.reference {
         let (rdr, _) = niffler::from_path(path)?;
         let fasta_rdr = bio::io::fasta::Reader::new(rdr);
         seq_map = Some(create_seq_map(fasta_rdr)?);
@@ -91,7 +91,11 @@ fn main() -> Result<()> {
             .expect("Could not compare the float values")
     });
 
-    let m = oxo_pileups.len();
+    let m = if opt.reference.is_some() {
+        oxo_pileups.len() * 2
+    } else {
+        oxo_pileups.len()
+    };
 
     if opt.with_track_line {
         println!("{}", TRACK_LINE);
