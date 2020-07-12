@@ -7,6 +7,7 @@ mod cli;
 mod error;
 
 use crate::alignment::OxoPileup;
+use bio::utils::Interval;
 use log::error;
 use rayon::prelude::*;
 use rust_htslib::{bam, bam::Read};
@@ -38,6 +39,7 @@ fn main() -> Result<()> {
 
     let alpha = opt.alpha;
     let mut seq_map = None;
+    let mut bed_map = HashMap::<String, Vec<Interval<u64>>>::new();
 
     if let Some(ref path) = opt.reference {
         let (rdr, _) = niffler::from_path(path)?;
@@ -45,10 +47,41 @@ fn main() -> Result<()> {
         seq_map = Some(create_seq_map(fasta_rdr)?);
     }
 
-    for p in pileups {
+    if let Some(ref path) = opt.bed {
+        let (rdr, _) = niffler::from_path(path)?;
+        let mut bed_rdr = bio::io::bed::Reader::new(rdr);
+        for (i, record) in bed_rdr.records().enumerate() {
+            let record = record.or_else(|_| Err(crate::error::Error::BedRecordError(i + 1)))?;
+            let interval = Interval::new(std::ops::Range {
+                start: record.start(),
+                end: record.end(),
+            })
+            .or_else(|_| {
+                Err(crate::error::Error::IncorrectInterval(
+                    i,
+                    record.start(),
+                    record.end(),
+                ))
+            })?;
+            let regions = bed_map.entry(record.chrom().to_string()).or_default();
+            regions.push(interval);
+        }
+    }
+
+    'pileups: for p in pileups {
         let pileup = p?;
         let pos = pileup.pos() as usize;
         let seq_name = String::from_utf8(header.tid2name(pileup.tid()).to_vec())?;
+        if !bed_map.is_empty() {
+            match bed_map.get(&seq_name) {
+                Some(regions) => {
+                    if !regions.iter().any(|region| region.contains(&(pos as u64))) {
+                        continue 'pileups;
+                    }
+                }
+                _ => continue 'pileups,
+            }
+        }
         let seq = match seq_map {
             Some(ref seq_map) => seq_map.get(&seq_name),
             None => None,

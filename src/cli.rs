@@ -60,6 +60,12 @@ pub(crate) struct RustyNuc {
         help = "Include track line (for correct visualization with IGV)"
     )]
     pub(crate) with_track_line: bool,
+    #[structopt(
+        short,
+        long,
+        help = "A BED file to restrict analysis to specific regions"
+    )]
+    pub(crate) bed: Option<PathBuf>,
 }
 
 impl RustyNuc {

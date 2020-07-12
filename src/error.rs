@@ -24,4 +24,10 @@ pub enum Error {
     #[error("Only A, G, C and T nucleotides are allowed but got {0}")]
     /// Incorect nucleotide supplied
     IncorrectNuc(String),
+    #[error("Could not read BED entry at line {0}")]
+    /// Incorect nucleotide supplied
+    BedRecordError(usize),
+    #[error("Incorrect interval in BED entry on line {0}, end {1} is smaller than start {2} ")]
+    /// Incorect nucleotide supplied
+    IncorrectInterval(usize, u64, u64),
 }
