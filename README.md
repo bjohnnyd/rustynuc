@@ -67,7 +67,7 @@ OPTIONS:
     -t, --threads <threads>          Number of threads [default: 4]
 
 ARGS:
-    <bam>    Alignments to correct for possible 8-oxoG damage
+    <bam>    Alignments to investigatecorrect for potential 8-oxoG damage
 ```
 ### Output
 
@@ -92,7 +92,11 @@ Output is a BED file with the following info:
 15/16. Significant at set FDR value (1 if yes, 0 if not)
 ```
 
-To get only positions with p-value below 0.05 the results can be piped through awk `rustynuc -r tests/input/ref.fa.gz tests/alignments/oxog.bam | awk '$12 < 0.05 || $13 < 0.05'`.
+To get only positions with p-value below 0.05: 
+
+```bash
+$ rustynuc -r tests/input/ref.fa.gz tests/alignments/oxog.bam | awk '$12 < 0.05 || $13 < 0.05'  | gzip > sig.bed.gz
+```
 
 
 ## Authors and Citation
