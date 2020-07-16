@@ -177,7 +177,7 @@ fn create_bed_map<T: std::io::Read>(
 
 fn is_s(seq: &[u8], pos: usize) -> bool {
     match seq[pos] {
-        b'G' | b'C' => true,
+        b'G' | b'C' | b'g' | b'c' => true,
         _ => false,
     }
 }

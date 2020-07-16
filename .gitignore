@@ -2,4 +2,6 @@
 /oxo/target
 **.txt
 /doc
+/**.svg
+/**.data
 
