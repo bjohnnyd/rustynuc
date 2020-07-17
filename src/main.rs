@@ -11,6 +11,7 @@ use bio::utils::Interval;
 use log::error;
 use rayon::prelude::*;
 use rust_htslib::{bam, bam::Read};
+use rust_htslib::{bcf, bcf::Read as VcfRead};
 use std::collections::HashMap;
 use structopt::StructOpt;
 
@@ -39,6 +40,7 @@ fn main() -> Result<()> {
 
     let mut seq_map = HashMap::new();
     let mut bed_map = HashMap::new();
+    let vcf: Option<String> = None;
 
     if let Some(ref path) = opt.reference {
         let (rdr, _) = niffler::from_path(path)?;
@@ -50,6 +52,21 @@ fn main() -> Result<()> {
         let (rdr, _) = niffler::from_path(path)?;
         let bed_rdr = bio::io::bed::Reader::new(rdr);
         create_bed_map(bed_rdr, &mut bed_map)?;
+    }
+
+    if let Some(ref path) = opt.vcf {
+        let mut vcf = bcf::Reader::from_path(path)?;
+        vcf.set_threads(opt.threads)?;
+        for record in vcf.records() {
+            let record = record?;
+            let reference = record.alleles()[0];
+            if reference.len() == 1 && is_s(reference, 0) {
+                let id = unsafe { String::from_utf8_unchecked(record.id()) };
+                let ref_allele = unsafe { String::from_utf8_unchecked(reference.to_vec()) };
+                let pos = record.pos();
+                println!("{}\t{}\t{}\t{}", id, ref_allele, pos, record.desc());
+            }
+        }
     }
 
     'pileups: for p in pileups {

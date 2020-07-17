@@ -68,6 +68,12 @@ pub(crate) struct RustyNuc {
     pub(crate) bed: Option<PathBuf>,
     #[structopt(short, long, help = "Skip calculating qvalue")]
     pub(crate) no_qval: bool,
+    #[structopt(
+        short,
+        long,
+        help = "VCF of variants called on the supplied alignment file"
+    )]
+    pub(crate) vcf: Option<PathBuf>,
 }
 
 impl RustyNuc {

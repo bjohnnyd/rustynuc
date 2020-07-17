@@ -30,4 +30,7 @@ pub enum Error {
     #[error("Incorrect interval in BED entry on line {0}, end {1} is smaller than start {2} ")]
     /// Incorect nucleotide supplied
     IncorrectInterval(usize, u64, u64),
+    #[error("Could not read VCF/BCF file")]
+    /// Read VCF/BCF Error
+    CouldNotReadVcf(#[from] rust_htslib::bcf::Error),
 }
