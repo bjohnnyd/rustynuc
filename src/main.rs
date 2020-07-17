@@ -31,21 +31,19 @@ fn main() -> Result<()> {
         .or_else(|_| Err(crate::error::Error::ThreadError))?;
 
     let mut bam = bam::Reader::from_path(opt.bam)?;
-    bam.set_threads(opt.threads)?;
     let header = bam.header().clone();
-
-    let mut pileups = bam.pileup();
-    pileups.set_max_depth(opt.max_depth);
+    let pileups = create_pileups(&mut bam, opt.threads, opt.max_depth)?;
     let mut oxo_pileups = Vec::new();
 
     let alpha = opt.alpha;
-    let mut seq_map = None;
-    let mut bed_map = HashMap::<String, Vec<Interval<u64>>>::new();
+
+    let mut seq_map = HashMap::new();
+    let mut bed_map = HashMap::new();
 
     if let Some(ref path) = opt.reference {
         let (rdr, _) = niffler::from_path(path)?;
         let fasta_rdr = bio::io::fasta::Reader::new(rdr);
-        seq_map = Some(create_seq_map(fasta_rdr)?);
+        seq_map = create_seq_map(fasta_rdr)?;
     }
 
     if let Some(ref path) = opt.bed {
@@ -71,39 +69,26 @@ fn main() -> Result<()> {
                 _ => continue 'pileups,
             }
         }
-        let seq = match seq_map {
-            Some(ref seq_map) => seq_map.get(&seq_name),
-            None => None,
-        };
+        let seq = seq_map.get(&seq_name);
+        match seq {
+            Some(seq) if !is_s(seq.as_bytes(), pos) => {}
+            _ => {
+                let oxo = OxoPileup::new(
+                    seq_name,
+                    pileup,
+                    Some(opt.min_reads),
+                    opt.quality,
+                    opt.pseudocount,
+                    seq,
+                );
 
-        let update = match seq {
-            Some(seq) => {
-                if pos >= seq.len() {
-                    error!("Reference sequence is shorter than BAM alignment positions");
-                    std::process::exit(1)
-                } else {
-                    is_s(seq.as_bytes(), pos)
+                if opt.all {
+                    oxo_pileups.push(oxo);
+                } else if !oxo.is_monomorphic() && oxo.occurence_sufficient(opt.min_reads) {
+                    oxo_pileups.push(oxo);
                 }
             }
-            None => true,
         };
-
-        if update {
-            let oxo = OxoPileup::new(
-                seq_name,
-                pileup,
-                Some(opt.min_reads),
-                opt.quality,
-                opt.pseudocount,
-                seq,
-            );
-
-            if opt.all {
-                oxo_pileups.push(oxo);
-            } else if !oxo.is_monomorphic() && oxo.occurence_sufficient(opt.min_reads) {
-                oxo_pileups.push(oxo);
-            }
-        }
     }
 
     oxo_pileups.sort_by(|a, b| {
@@ -136,6 +121,18 @@ fn main() -> Result<()> {
         .collect::<Result<Vec<()>>>();
 
     Ok(())
+}
+
+fn create_pileups<'a>(
+    bam: &'a mut bam::Reader,
+    threads: usize,
+    max_depth: u32,
+) -> Result<bam::pileup::Pileups<'a, bam::Reader>> {
+    bam.set_threads(threads)?;
+
+    let mut pileups = bam.pileup();
+    pileups.set_max_depth(max_depth);
+    Ok(pileups)
 }
 
 fn create_seq_map<T: std::io::Read>(
@@ -176,8 +173,13 @@ fn create_bed_map<T: std::io::Read>(
 }
 
 fn is_s(seq: &[u8], pos: usize) -> bool {
-    match seq[pos] {
-        b'G' | b'C' | b'g' | b'c' => true,
-        _ => false,
+    if pos >= seq.len() {
+        error!("Reference sequence is shorter than BAM alignment positions");
+        std::process::exit(1)
+    } else {
+        match seq[pos] {
+            b'G' | b'C' | b'g' | b'c' => true,
+            _ => false,
+        }
     }
 }
