@@ -24,6 +24,8 @@ type Result<T> = std::result::Result<T, crate::error::Error>;
 fn main() -> Result<()> {
     let opt = cli::RustyNuc::from_args();
     opt.set_logging();
+    let alpha = opt.alpha;
+    let calc_qval = !opt.no_qval;
 
     rayon::ThreadPoolBuilder::new()
         .num_threads(opt.threads)
@@ -34,8 +36,6 @@ fn main() -> Result<()> {
     let header = bam.header().clone();
     let pileups = create_pileups(&mut bam, opt.threads, opt.max_depth)?;
     let mut oxo_pileups = Vec::new();
-
-    let alpha = opt.alpha;
 
     let mut seq_map = HashMap::new();
     let mut bed_map = HashMap::new();
@@ -56,17 +56,12 @@ fn main() -> Result<()> {
         let pileup = p?;
         let pos = pileup.pos() as usize;
         let seq_name = String::from_utf8(header.tid2name(pileup.tid()).to_vec())?;
-        if !bed_map.is_empty() {
-            match bed_map.get(&seq_name) {
-                Some(regions) => {
-                    if !regions
-                        .par_iter()
-                        .any(|region| region.contains(&(pos as u64)))
-                    {
-                        continue 'pileups;
-                    }
-                }
-                _ => continue 'pileups,
+        if let Some(regions) = bed_map.get(&seq_name) {
+            if !regions
+                .par_iter()
+                .any(|region| region.contains(&(pos as u64)))
+            {
+                continue 'pileups;
             }
         }
         let seq = seq_map.get(&seq_name);
@@ -91,12 +86,14 @@ fn main() -> Result<()> {
         };
     }
 
-    oxo_pileups.sort_by(|a, b| {
-        a.min_p_value()
-            .expect("Could not calculate min pval")
-            .partial_cmp(&b.min_p_value().expect("Could not calculate min pval"))
-            .expect("Could not compare the float values")
-    });
+    if calc_qval {
+        oxo_pileups.sort_by(|a, b| {
+            a.min_p_value()
+                .expect("Could not calculate min pval")
+                .partial_cmp(&b.min_p_value().expect("Could not calculate min pval"))
+                .expect("Could not compare the float values")
+        });
+    }
 
     let m = if opt.reference.is_some() {
         oxo_pileups.len() * 2
@@ -112,10 +109,13 @@ fn main() -> Result<()> {
         .enumerate()
         .map(|(rank, p)| {
             let pval = p.min_p_value()?;
-            let qval = (alpha * rank as f32) / m as f32;
-            let sig = if pval < qval as f64 { 1 } else { 0 };
-            let corrected = format!("{}\t{}", qval, sig);
-            println!("{}\t{}\t{}", p.to_bed_entry()?, qval, sig);
+            let mut corrected = String::from("");
+            if calc_qval {
+                let qval = (alpha * rank as f32) / m as f32;
+                let sig = if pval < qval as f64 { 1 } else { 0 };
+                corrected = format!("{}\t{}", qval, sig);
+            }
+            println!("{}\t{}", p.to_bed_entry()?, corrected);
             Ok(())
         })
         .collect::<Result<Vec<()>>>();

@@ -42,7 +42,7 @@ $ ./rustynuc -h
 ```
 
 ```
-rustynuc 0.1.0
+rustynuc 0.2.0
 
 USAGE:
     rustynuc [FLAGS] [OPTIONS] <bam>
@@ -50,6 +50,7 @@ USAGE:
 FLAGS:
     -a, --all                Whether to just print results for all positions
     -h, --help               Prints help information
+    -n, --no-qval            Skip calculating qvalue
     -p, --pseudocount        Whether to use pseudocounts (adds +1 to all counts) when calculating statistics
     -V, --version            Prints version information
     -v, --verbosity          Determines verbosity of the processing, can be specified multiple times -vvv
@@ -57,6 +58,7 @@ FLAGS:
 
 OPTIONS:
         --alpha <alpha>              FDR threshold [default: 0.2]
+    -b, --bed <bed>                  A BED file to restrict analysis to specific regions
         --fisher-sig <fisher-sig>    Significance threshold for Fisher's test [default: 0.05]
         --max-depth <max-depth>      Maximum pileup depth to use [default: 400]
     -m, --min-reads <min-reads>      Minimum number of aligned reads in ff or fr orientation for a position to be
@@ -67,8 +69,9 @@ OPTIONS:
     -t, --threads <threads>          Number of threads [default: 4]
 
 ARGS:
-    <bam>    Alignments to investigate for potential 8-oxoG damage
+    <bam>    Alignments to correct for possible 8-oxoG damage
 ```
+
 ### Output
 
 Output is a BED file with the following info:

@@ -66,6 +66,8 @@ pub(crate) struct RustyNuc {
         help = "A BED file to restrict analysis to specific regions"
     )]
     pub(crate) bed: Option<PathBuf>,
+    #[structopt(short, long, help = "Skip calculating qvalue")]
+    pub(crate) no_qval: bool,
 }
 
 impl RustyNuc {
