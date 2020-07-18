@@ -15,9 +15,6 @@ use rust_htslib::{bcf, bcf::Read as VcfRead};
 use std::collections::{HashMap, HashSet};
 use structopt::StructOpt;
 
-// TODO: Create a wrapper around the vector of OxoPileups
-// this way if VCF is provided the internal would be a HashMap
-// However if no VCF is provided then vector is the option due to sort
 /// Nucleotide alphabet used
 pub const NUCLEOTIDES: [u8; 4] = [b'A', b'C', b'G', b'T'];
 /// Defualt visualization settings for track line
@@ -59,7 +56,6 @@ fn main() -> Result<()> {
 
     if let Some(ref path) = opt.vcf {
         let mut vcf = bcf::Reader::from_path(path)?;
-        vcf.set_threads(opt.threads)?;
         for record in vcf.records() {
             let record = record?;
             let reference = record.alleles()[0];
@@ -107,39 +103,63 @@ fn main() -> Result<()> {
         };
     }
 
-    if calc_qval {
-        oxo_pileups.sort_by(|a, b| {
-            a.min_p_value()
-                .expect("Could not calculate min pval")
-                .partial_cmp(&b.min_p_value().expect("Could not calculate min pval"))
-                .expect("Could not compare the float values")
-        });
-    }
+    if let Some(ref path) = opt.vcf {
+        // TODO: Implement methods to
+        // 1. Update VCF record if Oxo (filter and info fields)
+        // 2. Update header with the Oxo Info
+        let mut oxo_dict = HashMap::new();
+        for oxo in oxo_pileups.into_iter() {
+            oxo_dict.insert(oxo.desc(), oxo);
+        }
 
-    let m = if opt.reference.is_some() {
-        oxo_pileups.len() * 2
-    } else {
-        oxo_pileups.len()
-    };
+        let mut vcf = bcf::Reader::from_path(path)?;
+        let header = bcf::header::Header::from_template(&vcf.header());
+        let mut wrt = bcf::Writer::from_stdout(&header, true, bcf::Format::VCF)?;
+        wrt.set_threads(opt.threads)?;
 
-    if opt.with_track_line {
-        println!("{}", TRACK_LINE);
-    }
-    let _ = oxo_pileups
-        .par_iter()
-        .enumerate()
-        .map(|(rank, p)| {
-            let pval = p.min_p_value()?;
-            let mut corrected = String::from("");
-            if calc_qval {
-                let qval = (alpha * rank as f32) / m as f32;
-                let sig = if pval < qval as f64 { 1 } else { 0 };
-                corrected = format!("{}\t{}", qval, sig);
+        for record in vcf.records() {
+            let mut record = record?;
+            if let Some(oxo) = oxo_dict.get(&record.desc()) {
+                update_vcf_record(&mut record);
             }
-            println!("{}\t{}", p.to_bed_entry()?, corrected);
-            Ok(())
-        })
-        .collect::<Result<Vec<()>>>();
+            wrt.write(&record)?;
+        }
+    } else {
+        if calc_qval {
+            oxo_pileups.sort_by(|a, b| {
+                a.min_p_value()
+                    .expect("Could not calculate min pval")
+                    .partial_cmp(&b.min_p_value().expect("Could not calculate min pval"))
+                    .expect("Could not compare the float values")
+            });
+        }
+
+        let m = if opt.reference.is_some() {
+            oxo_pileups.len() * 2
+        } else {
+            oxo_pileups.len()
+        };
+
+        if opt.with_track_line {
+            println!("{}", TRACK_LINE);
+        }
+
+        let _ = oxo_pileups
+            .par_iter()
+            .enumerate()
+            .map(|(rank, p)| {
+                let pval = p.min_p_value()?;
+                let mut corrected = String::from("");
+                if calc_qval {
+                    let qval = (alpha * rank as f32) / m as f32;
+                    let sig = if pval < qval as f64 { 1 } else { 0 };
+                    corrected = format!("{}\t{}", qval, sig);
+                }
+                println!("{}\t{}", p.to_bed_entry()?, corrected);
+                Ok(())
+            })
+            .collect::<Result<Vec<()>>>();
+    }
 
     Ok(())
 }
@@ -203,4 +223,8 @@ fn is_s(seq: &[u8], pos: usize) -> bool {
             _ => false,
         }
     }
+}
+
+fn update_vcf_record(record: &mut bcf::Record) -> () {
+    unimplemented!()
 }

@@ -102,6 +102,11 @@ impl OxoPileup {
         }
     }
 
+    /// Returns a description of the pileup in the form `chrom:pos`
+    pub fn desc(&self) -> String {
+        format!("{}:{}", self.chrom, self.ref_pos)
+    }
+
     /// Checks if the coverage is above the supplied minimum
     pub fn occurence_sufficient(&self, min_count: u32) -> bool {
         self.nuc_counts(ReadType::FF)
