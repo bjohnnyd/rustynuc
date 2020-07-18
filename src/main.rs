@@ -12,9 +12,12 @@ use log::error;
 use rayon::prelude::*;
 use rust_htslib::{bam, bam::Read};
 use rust_htslib::{bcf, bcf::Read as VcfRead};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use structopt::StructOpt;
 
+// TODO: Create a wrapper around the vector of OxoPileups
+// this way if VCF is provided the internal would be a HashMap
+// However if no VCF is provided then vector is the option due to sort
 /// Nucleotide alphabet used
 pub const NUCLEOTIDES: [u8; 4] = [b'A', b'C', b'G', b'T'];
 /// Defualt visualization settings for track line
@@ -40,7 +43,7 @@ fn main() -> Result<()> {
 
     let mut seq_map = HashMap::new();
     let mut bed_map = HashMap::new();
-    let vcf: Option<String> = None;
+    let mut variant_pos = HashSet::new();
 
     if let Some(ref path) = opt.reference {
         let (rdr, _) = niffler::from_path(path)?;
@@ -61,10 +64,7 @@ fn main() -> Result<()> {
             let record = record?;
             let reference = record.alleles()[0];
             if reference.len() == 1 && is_s(reference, 0) {
-                let id = unsafe { String::from_utf8_unchecked(record.id()) };
-                let ref_allele = unsafe { String::from_utf8_unchecked(reference.to_vec()) };
-                let pos = record.pos();
-                println!("{}\t{}\t{}\t{}", id, ref_allele, pos, record.desc());
+                variant_pos.insert(record.desc());
             }
         }
     }
@@ -80,6 +80,10 @@ fn main() -> Result<()> {
             {
                 continue 'pileups;
             }
+        }
+
+        if !variant_pos.is_empty() && !variant_pos.contains(&format!("{}:{}", &seq_name, pos)) {
+            continue 'pileups;
         }
         let seq = seq_map.get(&seq_name);
         match seq {
