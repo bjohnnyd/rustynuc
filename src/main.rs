@@ -7,6 +7,7 @@ mod cli;
 mod error;
 
 use crate::alignment::OxoPileup;
+use alignment::ReadType;
 use bio::utils::Interval;
 use log::error;
 use rayon::prelude::*;
@@ -19,6 +20,24 @@ use structopt::StructOpt;
 pub const NUCLEOTIDES: [u8; 4] = [b'A', b'C', b'G', b'T'];
 /// Defualt visualization settings for track line
 pub const TRACK_LINE: &str = "#coords 0";
+/// Header information added to VCF
+pub const HEADER_RECORDS: [&[u8]; 9] = [
+    br#"##FILTER=<ID=OxoG,Description="OxoG two-sided p-value < 0.05">"#,
+    br#"##INFO=<ID=OXO_DEPTH,Number=1,Type=Integer,Description="OxoG Pileup Depth">"#,
+    br#"##INFO=<ID=ADENINE_FF_FR,Number=2,Type=Integer,Description="Adenine counts at FF and FR">"#,
+    br#"##INFO=<ID=CYTOSINE_FF_FR,Number=2,Type=Integer,Description="Cytosine counts at FF and FR">"#,
+    br#"##INFO=<ID=GUANINE_FF_FR,Number=2,Type=Integer,Description="Guanine counts at FF and FR">"#,
+    br#"##INFO=<ID=THYMINE_FF_FR,Number=2,Type=Integer,Description="Thymine counts at FF and FR">"#,
+    br#"##INFO=<ID=A_C_PVAL,Number=FLOAT,Type=Integer,Description="A/C two-sided p-value">"#,
+    br#"##INFO=<ID=G_T_PVAL,Number=FLOAT,Type=Integer,Description="G/T two-sided p-value">"#,
+    br#"##INFO=<ID=OXO_CONTEXT,Number=1,Type=String,Description="3mer Context of readerence">"#,
+];
+
+/// Name of the OxoG filter to be added to VCF header
+pub const OXO_FILTER: &[u8] = b"OxoG";
+
+/// Significance Threshold for two-sided test
+pub const SIG_THRESHOLD: f32 = 0.05;
 
 type Result<T> = std::result::Result<T, crate::error::Error>;
 
@@ -113,14 +132,25 @@ fn main() -> Result<()> {
         }
 
         let mut vcf = bcf::Reader::from_path(path)?;
-        let header = bcf::header::Header::from_template(&vcf.header());
+        let header = HEADER_RECORDS.iter().fold(
+            bcf::header::Header::from_template(&vcf.header()),
+            |mut header, header_record| {
+                header.push_record(header_record);
+                header
+            },
+        );
+
         let mut wrt = bcf::Writer::from_stdout(&header, true, bcf::Format::VCF)?;
+        // let mut wrt_record = wrt.empty_record();
+        let filter_id = wrt.header().name_to_id(OXO_FILTER)?;
+
         wrt.set_threads(opt.threads)?;
 
         for record in vcf.records() {
             let mut record = record?;
+            wrt.translate(&mut record);
             if let Some(oxo) = oxo_dict.get(&record.desc()) {
-                update_vcf_record(&mut record);
+                update_vcf_record(&mut record, &oxo, filter_id)?;
             }
             wrt.write(&record)?;
         }
@@ -225,6 +255,39 @@ fn is_s(seq: &[u8], pos: usize) -> bool {
     }
 }
 
-fn update_vcf_record(record: &mut bcf::Record) -> () {
-    unimplemented!()
+fn update_vcf_record(
+    record: &mut bcf::Record,
+    oxo: &OxoPileup,
+    filter_id: bcf::header::Id,
+) -> Result<()> {
+    let counts = oxo
+        .nuc_counts(ReadType::FF)
+        .iter()
+        .zip(oxo.nuc_counts(ReadType::FR))
+        .map(|(ff_count, fr_count)| {
+            (
+                (ff_count - oxo.pseudocount) as i32,
+                (fr_count - oxo.pseudocount) as i32,
+            )
+        })
+        .collect::<Vec<(i32, i32)>>();
+
+    let ac_pval = oxo.get_pval(b'A')? as f32;
+    let gt_pval = oxo.get_pval(b'G')? as f32;
+    let context = match oxo.context {
+        Some(ref seq) => seq,
+        _ => "".as_bytes(),
+    };
+
+    record.push_info_integer(b"OXO_DEPTH", &[oxo.ref_depth as i32])?;
+    record.push_info_integer(b"ADENINE_FF_FR", &[counts[0].0, counts[0].1])?;
+    record.push_info_integer(b"GUANINE_FF_FR", &[counts[1].0, counts[1].1])?;
+    record.push_info_integer(b"CYTOSINE_FF_FR", &[counts[2].0, counts[2].1])?;
+    record.push_info_integer(b"THYMINE_FF_FR", &[counts[3].0, counts[3].1])?;
+    record.push_info_float(b"A_C_PVAL", &[ac_pval])?;
+    record.push_info_string(b"OXO_CONTEXT", &[context])?;
+    if ac_pval < SIG_THRESHOLD || gt_pval < SIG_THRESHOLD {
+        record.push_filter(filter_id);
+    }
+    Ok(())
 }
