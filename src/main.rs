@@ -27,7 +27,7 @@ pub const NUCLEOTIDES: [u8; 4] = [b'A', b'C', b'G', b'T'];
 /// Defualt visualization settings for track line
 pub const TRACK_LINE: &str = "#coords 0";
 /// Header information added to VCF
-pub const HEADER_RECORDS: [&[u8]; 10] = [
+pub const HEADER_RECORDS: [&[u8]; 11] = [
     br#"##FILTER=<ID=OxoG,Description="OxoG two-sided p-value < 0.05">"#,
     br#"##FILTER=<ID=OccurenceInsufficient,Description="There is not a sufficient number of reads aligning in the FF and FR orientation">"#,
     br#"##INFO=<ID=OXO_DEPTH,Number=1,Type=Integer,Description="OxoG Pileup Depth">"#,
@@ -37,7 +37,8 @@ pub const HEADER_RECORDS: [&[u8]; 10] = [
     br#"##INFO=<ID=THYMINE_FF_FR,Number=2,Type=Integer,Description="Thymine counts at FF and FR">"#,
     br#"##INFO=<ID=A_C_PVAL,Number=1,Type=Float,Description="A/C two-sided p-value">"#,
     br#"##INFO=<ID=G_T_PVAL,Number=1,Type=Float,Description="G/T two-sided p-value">"#,
-    br#"##INFO=<ID=OXO_CONTEXT,Number=1,Type=String,Description="3mer Context of readerence">"#,
+    br#"##INFO=<ID=AF_FF_FR,Number=2,Type=Float,Description="Alternate frequency calculations on the FF and FR">"#,
+    br#"##INFO=<ID=OXO_CONTEXT,Number=1,Type=String,Description="3mer Context of reference">"#,
 ];
 
 /// Name for significant filter
@@ -285,29 +286,66 @@ fn update_vcf_record(
         })
         .collect::<Vec<(i32, i32)>>();
 
+    let a_counts = counts[0];
+    let c_counts = counts[1];
+    let g_counts = counts[2];
+    let t_counts = counts[3];
+
     let ac_pval = oxo.get_pval(b'C')?;
     let gt_pval = oxo.get_pval(b'G')?;
+    let is_oxog = ac_pval < sig_threshold || gt_pval < sig_threshold;
+
     let context = match oxo.context {
         Some(ref seq) => seq,
         _ => "".as_bytes(),
     };
 
+    let alt_alleles = record
+        .alleles()
+        .into_iter()
+        .skip(1)
+        .filter(|allele| allele == b"T" || allele == b"A")
+        .map(|allele| allele.to_owned())
+        .collect::<Vec<Vec<u8>>>();
+
+    let ref_allele = record.alleles()[0].to_owned();
+
     record.push_info_integer(b"OXO_DEPTH", &[oxo.ref_depth as i32])?;
-    record.push_info_integer(b"ADENINE_FF_FR", &[counts[0].0, counts[0].1])?;
-    record.push_info_integer(b"CYTOSINE_FF_FR", &[counts[1].0, counts[1].1])?;
-    record.push_info_integer(b"GUANINE_FF_FR", &[counts[2].0, counts[2].1])?;
-    record.push_info_integer(b"THYMINE_FF_FR", &[counts[3].0, counts[3].1])?;
+    record.push_info_integer(b"ADENINE_FF_FR", &[a_counts.0, a_counts.1])?;
+    record.push_info_integer(b"CYTOSINE_FF_FR", &[c_counts.0, c_counts.1])?;
+    record.push_info_integer(b"GUANINE_FF_FR", &[g_counts.0, g_counts.1])?;
+    record.push_info_integer(b"THYMINE_FF_FR", &[t_counts.0, t_counts.1])?;
     record.push_info_float(b"A_C_PVAL", &[ac_pval as f32])?;
     record.push_info_float(b"G_T_PVAL", &[gt_pval as f32])?;
     record.push_info_string(b"OXO_CONTEXT", &[context])?;
+
+    match ref_allele.as_slice() {
+        b"G" if alt_alleles.contains(&b"T".to_vec()) => {
+            if is_oxog {
+                record.push_filter(filter_id.0)
+            };
+
+            let ff_af = t_counts.0 as f32 / g_counts.0 as f32;
+            let fr_af = t_counts.1 as f32 / g_counts.1 as f32;
+
+            record.push_info_float(b"AF_FF_FR", &[ff_af, fr_af])?;
+        }
+        b"C" if alt_alleles.contains(&b"A".to_vec()) => {
+            if is_oxog {
+                record.push_filter(filter_id.0)
+            };
+
+            let ff_af = a_counts.0 as f32 / c_counts.0 as f32;
+            let fr_af = a_counts.1 as f32 / c_counts.1 as f32;
+
+            record.push_info_float(b"AF_FF_FR", &[ff_af, fr_af])?;
+        }
+        _ => {}
+    }
+
     if !oxo.occurence_sufficient() {
         record.push_filter(filter_id.1)
-    } else if ac_pval < sig_threshold || gt_pval < sig_threshold {
-        let alleles = record.alleles();
-        match (alleles[0], alleles[1]) {
-            (b"G", b"T") | (b"C", b"A") => record.push_filter(filter_id.0),
-            _ => {}
-        }
     }
+
     Ok(())
 }
