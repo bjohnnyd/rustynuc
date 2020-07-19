@@ -84,7 +84,7 @@ impl OxoPileup {
                 }
                 ReadType::FR => {
                     self.fr_count[*nuc as usize]
-                        + self.ff_count[(*nuc + 32) as usize]
+                        + self.fr_count[(*nuc + 32) as usize]
                         + self.pseudocount
                 }
             })

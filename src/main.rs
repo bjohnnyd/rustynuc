@@ -16,6 +16,8 @@ use rust_htslib::{bcf, bcf::Read as VcfRead};
 use std::collections::{HashMap, HashSet};
 use structopt::StructOpt;
 
+// TODO: By changing lookup to as array some test is being done wrong
+
 /// Nucleotide alphabet used
 pub const NUCLEOTIDES: [u8; 4] = [b'A', b'C', b'G', b'T'];
 /// Defualt visualization settings for track line
@@ -28,8 +30,8 @@ pub const HEADER_RECORDS: [&[u8]; 9] = [
     br#"##INFO=<ID=CYTOSINE_FF_FR,Number=2,Type=Integer,Description="Cytosine counts at FF and FR">"#,
     br#"##INFO=<ID=GUANINE_FF_FR,Number=2,Type=Integer,Description="Guanine counts at FF and FR">"#,
     br#"##INFO=<ID=THYMINE_FF_FR,Number=2,Type=Integer,Description="Thymine counts at FF and FR">"#,
-    br#"##INFO=<ID=A_C_PVAL,Number=FLOAT,Type=Integer,Description="A/C two-sided p-value">"#,
-    br#"##INFO=<ID=G_T_PVAL,Number=FLOAT,Type=Integer,Description="G/T two-sided p-value">"#,
+    br#"##INFO=<ID=A_C_PVAL,Number=1,Type=Float,Description="A/C two-sided p-value">"#,
+    br#"##INFO=<ID=G_T_PVAL,Number=1,Type=Float,Description="G/T two-sided p-value">"#,
     br#"##INFO=<ID=OXO_CONTEXT,Number=1,Type=String,Description="3mer Context of readerence">"#,
 ];
 
@@ -37,7 +39,6 @@ pub const HEADER_RECORDS: [&[u8]; 9] = [
 pub const OXO_FILTER: &[u8] = b"OxoG";
 
 /// Significance Threshold for two-sided test
-pub const SIG_THRESHOLD: f32 = 0.05;
 
 type Result<T> = std::result::Result<T, crate::error::Error>;
 
@@ -150,7 +151,7 @@ fn main() -> Result<()> {
             let mut record = record?;
             wrt.translate(&mut record);
             if let Some(oxo) = oxo_dict.get(&record.desc()) {
-                update_vcf_record(&mut record, &oxo, filter_id)?;
+                update_vcf_record(&mut record, &oxo, filter_id, opt.fisher_sig)?;
             }
             wrt.write(&record)?;
         }
@@ -259,6 +260,7 @@ fn update_vcf_record(
     record: &mut bcf::Record,
     oxo: &OxoPileup,
     filter_id: bcf::header::Id,
+    sig_threshold: f64,
 ) -> Result<()> {
     let counts = oxo
         .nuc_counts(ReadType::FF)
@@ -272,8 +274,8 @@ fn update_vcf_record(
         })
         .collect::<Vec<(i32, i32)>>();
 
-    let ac_pval = oxo.get_pval(b'A')? as f32;
-    let gt_pval = oxo.get_pval(b'G')? as f32;
+    let ac_pval = oxo.get_pval(b'C')?;
+    let gt_pval = oxo.get_pval(b'G')?;
     let context = match oxo.context {
         Some(ref seq) => seq,
         _ => "".as_bytes(),
@@ -281,13 +283,18 @@ fn update_vcf_record(
 
     record.push_info_integer(b"OXO_DEPTH", &[oxo.ref_depth as i32])?;
     record.push_info_integer(b"ADENINE_FF_FR", &[counts[0].0, counts[0].1])?;
-    record.push_info_integer(b"GUANINE_FF_FR", &[counts[1].0, counts[1].1])?;
-    record.push_info_integer(b"CYTOSINE_FF_FR", &[counts[2].0, counts[2].1])?;
+    record.push_info_integer(b"CYTOSINE_FF_FR", &[counts[1].0, counts[1].1])?;
+    record.push_info_integer(b"GUANINE_FF_FR", &[counts[2].0, counts[2].1])?;
     record.push_info_integer(b"THYMINE_FF_FR", &[counts[3].0, counts[3].1])?;
-    record.push_info_float(b"A_C_PVAL", &[ac_pval])?;
+    record.push_info_float(b"A_C_PVAL", &[ac_pval as f32])?;
+    record.push_info_float(b"G_T_PVAL", &[gt_pval as f32])?;
     record.push_info_string(b"OXO_CONTEXT", &[context])?;
-    if ac_pval < SIG_THRESHOLD || gt_pval < SIG_THRESHOLD {
-        record.push_filter(filter_id);
+    if ac_pval < sig_threshold || gt_pval < sig_threshold {
+        let alleles = record.alleles();
+        match (alleles[0], alleles[1]) {
+            (b"G", b"T") | (b"C", b"A") => record.push_filter(filter_id),
+            _ => {}
+        }
     }
     Ok(())
 }
