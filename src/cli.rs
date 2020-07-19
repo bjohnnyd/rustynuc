@@ -24,7 +24,7 @@ pub(crate) struct RustyNuc {
         default_value = "20"
     )]
     pub(crate) quality: u8,
-    #[structopt(long, help = "Maximum pileup depth to use", default_value = "400")]
+    #[structopt(long, help = "Maximum pileup depth to use", default_value = "1000")]
     pub(crate) max_depth: u32,
     #[structopt(
         long,

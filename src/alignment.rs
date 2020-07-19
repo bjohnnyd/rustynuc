@@ -15,7 +15,7 @@ pub struct OxoPileup {
     pub context: Option<[u8; 3]>,
     pub ff_count: [u32; 256],
     pub fr_count: [u32; 256],
-    pub min_count: Option<u32>,
+    pub min_count: u32,
     pub pseudocount: u32,
 }
 
@@ -28,7 +28,7 @@ impl OxoPileup {
     pub fn new<T: AsRef<[u8]>>(
         chrom: String,
         pileup: Pileup,
-        min_count: Option<u32>,
+        min_count: u32,
         min_qual: u8,
         pseudocount: bool,
         seq: Option<T>,
@@ -108,11 +108,11 @@ impl OxoPileup {
     }
 
     /// Checks if the coverage is above the supplied minimum
-    pub fn occurence_sufficient(&self, min_count: u32) -> bool {
+    pub fn occurence_sufficient(&self) -> bool {
         self.nuc_counts(ReadType::FF)
             .into_iter()
             .zip(self.nuc_counts(ReadType::FR).into_iter())
-            .filter(|(ff_count, fr_count)| *ff_count > min_count || *fr_count > min_count)
+            .filter(|(ff_count, fr_count)| *ff_count > self.min_count || *fr_count > self.min_count)
             .count()
             > 1
     }
@@ -135,45 +135,6 @@ impl OxoPileup {
         } else {
             false
         }
-    }
-
-    /// Checks if there are significant differences between nucleotides
-    /// on ff v fr
-    pub fn is_imbalanced(&self, sig: f64) -> Result<bool> {
-        let ff_nuc_counts = self.nuc_counts(ReadType::FF);
-        let fr_nuc_counts = self.nuc_counts(ReadType::FR);
-
-        let ac_counts = [
-            ff_nuc_counts[0],
-            ff_nuc_counts[1],
-            fr_nuc_counts[0],
-            fr_nuc_counts[1],
-        ];
-
-        let gt_counts = [
-            ff_nuc_counts[2],
-            ff_nuc_counts[3],
-            fr_nuc_counts[2],
-            fr_nuc_counts[3],
-        ];
-
-        let p_ac = fishers_exact(&ac_counts)?;
-        let p_gt = fishers_exact(&gt_counts)?;
-
-        let (ac_sufficient, gt_sufficient) = match self.min_count {
-            Some(count) => {
-                let ac_sufficient = (ac_counts[0] > count || ac_counts[2] > count)
-                    && (ac_counts[1] > count || ac_counts[3] > count);
-
-                let gt_sufficient = (gt_counts[0] > count || gt_counts[2] > count)
-                    && (gt_counts[1] > count || gt_counts[3] > count);
-                (ac_sufficient, gt_sufficient)
-            }
-            _ => (true, true),
-        };
-
-        Ok((p_ac.two_tail_pvalue < sig && ac_sufficient)
-            || (p_gt.two_tail_pvalue < sig && gt_sufficient))
     }
 
     /// Returns the two-tailed p.value for the A/C or G/T comparison
@@ -298,4 +259,9 @@ fn get_seq_context(seq: &[u8], pos: u32) -> [u8; 3] {
     }
 
     context
+}
+
+/// Represents the OxoPileup State
+pub enum State {
+    InsufficientCoverage,
 }

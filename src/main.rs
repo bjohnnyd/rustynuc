@@ -12,19 +12,24 @@ use bio::utils::Interval;
 use log::error;
 use rayon::prelude::*;
 use rust_htslib::{bam, bam::Read};
-use rust_htslib::{bcf, bcf::Read as VcfRead};
+use rust_htslib::{bcf, bcf::header::Id, bcf::Read as VcfRead};
 use std::collections::{HashMap, HashSet};
 use structopt::StructOpt;
 
-// TODO: By changing lookup to as array some test is being done wrong
+// TODO:
+// 1. Need to add a reason in info if not sufficient count, not alt canonical OxoG
+// 2. Need to maybe incorporate AF by FF/FR for better filtering
+// 3. Examples like 581774 where the primary alt is oxo-g but the secondary is real (might be
+//    better to label with a different filter like MultiOxoG)
 
 /// Nucleotide alphabet used
 pub const NUCLEOTIDES: [u8; 4] = [b'A', b'C', b'G', b'T'];
 /// Defualt visualization settings for track line
 pub const TRACK_LINE: &str = "#coords 0";
 /// Header information added to VCF
-pub const HEADER_RECORDS: [&[u8]; 9] = [
+pub const HEADER_RECORDS: [&[u8]; 10] = [
     br#"##FILTER=<ID=OxoG,Description="OxoG two-sided p-value < 0.05">"#,
+    br#"##FILTER=<ID=OccurenceInsufficient,Description="There is not a sufficient number of reads aligning in the FF and FR orientation">"#,
     br#"##INFO=<ID=OXO_DEPTH,Number=1,Type=Integer,Description="OxoG Pileup Depth">"#,
     br#"##INFO=<ID=ADENINE_FF_FR,Number=2,Type=Integer,Description="Adenine counts at FF and FR">"#,
     br#"##INFO=<ID=CYTOSINE_FF_FR,Number=2,Type=Integer,Description="Cytosine counts at FF and FR">"#,
@@ -35,10 +40,10 @@ pub const HEADER_RECORDS: [&[u8]; 9] = [
     br#"##INFO=<ID=OXO_CONTEXT,Number=1,Type=String,Description="3mer Context of readerence">"#,
 ];
 
-/// Name of the OxoG filter to be added to VCF header
+/// Name for significant filter
 pub const OXO_FILTER: &[u8] = b"OxoG";
-
-/// Significance Threshold for two-sided test
+/// Name for insufficient counts filter
+pub const INSUFFICIENT_FILTER: &[u8] = b"OccurenceInsufficient";
 
 type Result<T> = std::result::Result<T, crate::error::Error>;
 
@@ -108,7 +113,7 @@ fn main() -> Result<()> {
                 let oxo = OxoPileup::new(
                     seq_name,
                     pileup,
-                    Some(opt.min_reads),
+                    opt.min_reads,
                     opt.quality,
                     opt.pseudocount,
                     seq,
@@ -116,7 +121,7 @@ fn main() -> Result<()> {
 
                 if opt.all {
                     oxo_pileups.push(oxo);
-                } else if !oxo.is_monomorphic() && oxo.occurence_sufficient(opt.min_reads) {
+                } else if !oxo.is_monomorphic() && oxo.occurence_sufficient() {
                     oxo_pileups.push(oxo);
                 }
             }
@@ -143,7 +148,8 @@ fn main() -> Result<()> {
 
         let mut wrt = bcf::Writer::from_stdout(&header, true, bcf::Format::VCF)?;
         // let mut wrt_record = wrt.empty_record();
-        let filter_id = wrt.header().name_to_id(OXO_FILTER)?;
+        let oxo_id = wrt.header().name_to_id(OXO_FILTER)?;
+        let insufficient_filter = wrt.header().name_to_id(INSUFFICIENT_FILTER)?;
 
         wrt.set_threads(opt.threads)?;
 
@@ -151,7 +157,12 @@ fn main() -> Result<()> {
             let mut record = record?;
             wrt.translate(&mut record);
             if let Some(oxo) = oxo_dict.get(&record.desc()) {
-                update_vcf_record(&mut record, &oxo, filter_id, opt.fisher_sig)?;
+                update_vcf_record(
+                    &mut record,
+                    &oxo,
+                    (oxo_id, insufficient_filter),
+                    opt.fisher_sig,
+                )?;
             }
             wrt.write(&record)?;
         }
@@ -259,7 +270,7 @@ fn is_s(seq: &[u8], pos: usize) -> bool {
 fn update_vcf_record(
     record: &mut bcf::Record,
     oxo: &OxoPileup,
-    filter_id: bcf::header::Id,
+    filter_id: (Id, Id),
     sig_threshold: f64,
 ) -> Result<()> {
     let counts = oxo
@@ -289,10 +300,12 @@ fn update_vcf_record(
     record.push_info_float(b"A_C_PVAL", &[ac_pval as f32])?;
     record.push_info_float(b"G_T_PVAL", &[gt_pval as f32])?;
     record.push_info_string(b"OXO_CONTEXT", &[context])?;
-    if ac_pval < sig_threshold || gt_pval < sig_threshold {
+    if !oxo.occurence_sufficient() {
+        record.push_filter(filter_id.1)
+    } else if ac_pval < sig_threshold || gt_pval < sig_threshold {
         let alleles = record.alleles();
         match (alleles[0], alleles[1]) {
-            (b"G", b"T") | (b"C", b"A") => record.push_filter(filter_id),
+            (b"G", b"T") | (b"C", b"A") => record.push_filter(filter_id.0),
             _ => {}
         }
     }
