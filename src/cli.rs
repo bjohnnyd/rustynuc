@@ -60,20 +60,16 @@ pub(crate) struct RustyNuc {
         help = "Include track line (for correct visualization with IGV)"
     )]
     pub(crate) with_track_line: bool,
-    #[structopt(
-        short,
-        long,
-        help = "A BED file to restrict analysis to specific regions"
-    )]
+    #[structopt(long, help = "A BED file to restrict analysis to specific regions")]
     pub(crate) bed: Option<PathBuf>,
     #[structopt(short, long, help = "Skip calculating qvalue")]
     pub(crate) no_qval: bool,
     #[structopt(
         short,
         long,
-        help = "VCF of variants called on the supplied alignment file"
+        help = "BCF/VCF of variants called on the supplied alignment file"
     )]
-    pub(crate) vcf: Option<PathBuf>,
+    pub(crate) bcf: Option<PathBuf>,
 }
 
 impl RustyNuc {

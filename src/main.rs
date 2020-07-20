@@ -80,7 +80,7 @@ fn main() -> Result<()> {
         create_bed_map(bed_rdr, &mut bed_map)?;
     }
 
-    if let Some(ref path) = opt.vcf {
+    if let Some(ref path) = opt.bcf {
         let mut vcf = bcf::Reader::from_path(path)?;
         for record in vcf.records() {
             let record = record?;
@@ -129,7 +129,7 @@ fn main() -> Result<()> {
         };
     }
 
-    if let Some(ref path) = opt.vcf {
+    if let Some(ref path) = opt.bcf {
         // TODO: Implement methods to
         // 1. Update VCF record if Oxo (filter and info fields)
         // 2. Update header with the Oxo Info
