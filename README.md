@@ -58,9 +58,10 @@ FLAGS:
 
 OPTIONS:
         --alpha <alpha>              FDR threshold [default: 0.2]
-    -b, --bed <bed>                  A BED file to restrict analysis to specific regions
+    -b, --bcf <bcf>                  BCF/VCF of variants called on the supplied alignment file
+        --bed <bed>                  A BED file to restrict analysis to specific regions
         --fisher-sig <fisher-sig>    Significance threshold for Fisher's test [default: 0.05]
-        --max-depth <max-depth>      Maximum pileup depth to use [default: 400]
+        --max-depth <max-depth>      Maximum pileup depth to use [default: 1000]
     -m, --min-reads <min-reads>      Minimum number of aligned reads in ff or fr orientation for a position to be
                                      considered [default: 4]
     -q, --quality <quality>          Minimum base quality to consider [default: 20]
@@ -70,11 +71,12 @@ OPTIONS:
 
 ARGS:
     <bam>    Alignments to correct for possible 8-oxoG damage
+
 ```
 
 ### Output
 
-Output is a BED file with the following info:
+The default output (if not `--bcf/-b` is provided) is a BED file with the following info:
 
 ```
 1. Chromosome
@@ -101,14 +103,29 @@ To get only positions with p-value below 0.05:
 $ rustynuc -r tests/input/ref.fa.gz tests/alignments/oxog.bam | awk '$12 < 0.05 || $13 < 0.05'  | gzip > sig.bed.gz
 ```
 
+Alternatively, if a VCF/BCF is provided the output is a VCF.  Multiple summaries are provided and detailed in the VCF file. `AF_FF_FR` can be used to filter based on AF on the `FF` or `FR` fraction.  For each alternate allele, there are two AF provided so to filter the first alternate positions 0-1 should be used.  The command below will filter using the AF on FF/FR and also `FILTER=="PASS"` ensures only position with `p-val < 0.05` are considered.
 
-## Authors and Citation
+```bash
+$ FILTERCMD='TYPE =="snp" && AF > 0.04 && FILTER=="PASS" && (AF_FF_FR=="." | (AF_FF_FR[0] >= 0.04 && AF_FF_FR[1] >= 0.04))'
+$ rustynuc --pseudocounts -r tests/input/ref.fa.gz --b tests/input/oxog.vcf.gz tests/alignments/oxog.bam | bcftools filter -Oz -i "$FILTERCMD" > nonoxog.vcf.gz
+```
+
+## Authors
 
 - [Johnny Debebe][link-author]
 
 ## License
 
 The MIT License (MIT). Please see [License File](LICENSE.md) for more information.
+
+
+## Notes
+
+- all test results are heavily dependent on depth so in cases where depth is not as the `AF_FF_FR` filter might be a better option
+- fisher's exact is affected heavily by 0 counts so `pseudocounts` are going to produce a less conservative result
+- fisher's exact test is fairly conservative so might underestimate the true numbers
+- FDR will be heavily dependent on %GC of the genome, size of the genome, whether a reference was provided, a VCF is provide or the test was restricted to specific regions.  All these factors will affect how many tests will need to be performed.  
+- for all the tests here `DEPTH` will heavily determine power
 
 [ico-version]: https://img.shields.io/github/v/release/bjohnnyd/rustynuc?include_prereleases&style=flat-square
 [ico-license]: https://img.shields.io/github/license/bjohnnyd/rustynuc?color=purple&style=flat-square
