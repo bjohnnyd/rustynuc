@@ -35,6 +35,22 @@ fn cli_oxog_bam() {
 }
 
 #[test]
+fn cli_oxog_bcf() {
+    Command::cargo_bin("rustynuc")
+        .unwrap()
+        .args(&[
+            "-r",
+            "tests/input/ref.fa.gz",
+            "-b",
+            "tests/input/oxog.vcf.gz",
+            "tests/input/oxog.bam",
+        ])
+        .assert()
+        .stdout(contains("OxoG").count(5))
+        .stdout(contains("PASS"));
+}
+
+#[test]
 fn cli_print_all() {
     Command::cargo_bin("rustynuc")
         .unwrap()
