@@ -1,7 +1,7 @@
 use thiserror::Error;
 
 #[derive(Debug, Error)]
-/// Lists error commonly caused by I/O
+/// Errors of which majority are related to I/O issues
 pub enum Error {
     #[error("Could not read FASTA record")]
     /// Could not read an entry in a fasta file

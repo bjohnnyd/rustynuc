@@ -103,7 +103,23 @@ To get only positions with p-value below 0.05:
 $ rustynuc -r tests/input/ref.fa.gz tests/alignments/oxog.bam | awk '$12 < 0.05 || $13 < 0.05'  | gzip > sig.bed.gz
 ```
 
-Alternatively, if a VCF/BCF is provided the output is a VCF.  Multiple summaries are provided and detailed in the VCF file. `AF_FF_FR` can be used to filter based on AF on the `FF` or `FR` fraction.  For each alternate allele, there are two AF provided so to filter the first alternate positions 0-1 should be used.  The command below will filter using the AF on FF/FR and also `FILTER=="PASS"` ensures only position with `p-val < 0.05` are considered.
+Alternatively, if a VCF/BCF is provided the output is a VCF.  Multiple summaries are provided in the VCF file:
+
+```
+##FILTER=<ID=OxoG,Description="OxoG two-sided p-value < 0.05">,
+##FILTER=<ID=OccurenceInsufficient,Description="There is not a sufficient number of reads aligning in the FF and FR orientation">,
+##INFO=<ID=OXO_DEPTH,Number=1,Type=Integer,Description="OxoG Pileup Depth">,
+##INFO=<ID=ADENINE_FF_FR,Number=2,Type=Integer,Description="Adenine counts at FF and FR">,
+##INFO=<ID=CYTOSINE_FF_FR,Number=2,Type=Integer,Description="Cytosine counts at FF and FR">,
+##INFO=<ID=GUANINE_FF_FR,Number=2,Type=Integer,Description="Guanine counts at FF and FR">,
+##INFO=<ID=THYMINE_FF_FR,Number=2,Type=Integer,Description="Thymine counts at FF and FR">,
+##INFO=<ID=A_C_PVAL,Number=1,Type=Float,Description="A/C two-sided p-value">,
+##INFO=<ID=G_T_PVAL,Number=1,Type=Float,Description="G/T two-sided p-value">,
+##INFO=<ID=AF_FF_FR,Number=A,Type=Float,Description="Alternate frequency calculations on the FF and FR">,
+##INFO=<ID=OXO_CONTEXT,Number=1,Type=String,Description="3mer Context of reference">,
+```
+
+`AF_FF_FR` can be used to filter based on AF on the `FF` or `FR` orientations.  For each alternate allele, there are two AF provided so for example to filter the first alternate positions `AF_FF_FR[0]` and `AF_FF_FR[1]` can be used.  The command below will filter using the AF on FF/FR and also `FILTER=="PASS"` ensures only position with `p-val < 0.05` are returned.
 
 ```bash
 $ FILTERCMD='TYPE =="snp" && AF > 0.04 && FILTER=="PASS" && (AF_FF_FR=="." | (AF_FF_FR[0] >= 0.04 && AF_FF_FR[1] >= 0.04))'
@@ -121,11 +137,11 @@ The MIT License (MIT). Please see [License File](LICENSE.md) for more informatio
 
 ## Notes
 
-- all test results are heavily dependent on depth so in cases where depth is not as the `AF_FF_FR` filter might be a better option
-- fisher's exact is affected heavily by 0 counts so `pseudocounts` are going to produce a less conservative result
+- all test results are heavily dependent on depth so in cases where depth is not high the `AF_FF_FR` filter might be a better option
+- fisher's exact is affected heavily by 0 counts so `pseudocounts` are going to produce less conservative results
 - fisher's exact test is fairly conservative so might underestimate the true numbers
-- FDR will be heavily dependent on %GC of the genome, size of the genome, whether a reference was provided, a VCF is provide or the test was restricted to specific regions.  All these factors will affect how many tests will need to be performed.  
-- for all the tests here `DEPTH` will heavily determine power
+- FDR will be heavily dependent on %GC of the genome, size of the genome, whether a reference was provided, a VCF is provided or the test was restricted to specific regions.  All these factors will affect how many tests will need to be performed.  
+- for all the filtering methods `DEPTH` will heavily determine power
 
 [ico-version]: https://img.shields.io/github/v/release/bjohnnyd/rustynuc?include_prereleases&style=flat-square
 [ico-license]: https://img.shields.io/github/license/bjohnnyd/rustynuc?color=purple&style=flat-square

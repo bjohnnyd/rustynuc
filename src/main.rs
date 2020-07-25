@@ -17,9 +17,7 @@ use std::collections::{HashMap, HashSet};
 use structopt::StructOpt;
 
 // TODO:
-// 1. Need to add a reason in info if not sufficient count, not alt canonical OxoG
-// 2. Need to maybe incorporate AF by FF/FR for better filtering
-// 3. Examples like 581774 where the primary alt is oxo-g but the secondary is real (might be
+// 1. Examples like 581774 where the primary alt is oxo-g but the secondary is real (might be
 //    better to label with a different filter like MultiOxoG)
 
 /// Nucleotide alphabet used
