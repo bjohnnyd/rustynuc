@@ -105,7 +105,9 @@ fn main() -> Result<()> {
         if !variant_pos.is_empty() && !variant_pos.contains(&format!("{}:{}", &seq_name, pos)) {
             continue 'pileups;
         }
+
         let seq = seq_map.get(&seq_name);
+
         match seq {
             Some(seq) if !is_s(seq.as_bytes(), pos) => {}
             _ => {
@@ -282,24 +284,6 @@ fn update_vcf_record(
         })
         .collect::<HashMap<u8, [i32; 2]>>();
 
-    let ac_pval = oxo.get_pval(b'C')?;
-    let gt_pval = oxo.get_pval(b'G')?;
-    let is_oxog = ac_pval < sig_threshold || gt_pval < sig_threshold;
-
-    let context = match oxo.context {
-        Some(ref seq) => seq,
-        _ => "".as_bytes(),
-    };
-
-    let alt_alleles = record
-        .alleles()
-        .into_iter()
-        .skip(1)
-        .map(|allele| allele.to_owned())
-        .collect::<Vec<Vec<u8>>>();
-
-    let ref_allele = record.alleles()[0].to_owned();
-
     record.push_info_integer(b"OXO_DEPTH", &[oxo.ref_depth as i32])?;
     record.push_info_integer(
         b"ADENINE_FF_FR",
@@ -317,16 +301,27 @@ fn update_vcf_record(
         b"THYMINE_FF_FR",
         counts.get(&b'T').unwrap_or_else(|| &[0, 0]),
     )?;
+
+    let ac_pval = oxo.get_pval(b'C')?;
+    let gt_pval = oxo.get_pval(b'G')?;
+    let is_oxog = ac_pval < sig_threshold || gt_pval < sig_threshold;
     record.push_info_float(b"A_C_PVAL", &[ac_pval as f32])?;
     record.push_info_float(b"G_T_PVAL", &[gt_pval as f32])?;
-    record.push_info_string(b"OXO_CONTEXT", &[context])?;
 
-    match ref_allele.as_slice() {
-        b"G" | b"C" => {
-            if is_oxog {
-                record.push_filter(filter_id.0)
-            };
+    if let Some(ref seq) = oxo.context {
+        record.push_info_string(b"OXO_CONTEXT", &[seq])?;
+    }
 
+    if is_oxog {
+        record.push_filter(filter_id.0)
+    };
+
+    if !oxo.occurence_sufficient() {
+        record.push_filter(filter_id.1)
+    }
+
+    match record.alleles()[0] {
+        ref_allele if ref_allele == b"G" || ref_allele == b"C" => {
             let oxo_af =
                 record
                     .alleles()
@@ -345,10 +340,6 @@ fn update_vcf_record(
             record.push_info_float(b"AF_FF_FR", oxo_af.as_slice())?;
         }
         _ => {}
-    }
-
-    if !oxo.occurence_sufficient() {
-        record.push_filter(filter_id.1)
     }
 
     Ok(())
