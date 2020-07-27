@@ -65,6 +65,7 @@ fn main() -> Result<()> {
     let mut seq_map = HashMap::new();
     let mut bed_map = HashMap::new();
     let mut variant_pos = HashSet::new();
+    let mut oxo_var_dict = HashMap::new();
 
     if let Some(ref path) = opt.reference {
         let (rdr, _) = niffler::from_path(path)?;
@@ -108,34 +109,33 @@ fn main() -> Result<()> {
 
         let seq = seq_map.get(&seq_name);
 
-        match seq {
-            Some(seq) if !is_s(seq.as_bytes(), pos) => {}
-            _ => {
-                let oxo = OxoPileup::new(
-                    seq_name,
-                    pileup,
-                    opt.min_reads,
-                    opt.quality,
-                    opt.pseudocount,
-                    seq,
-                );
-
-                if opt.all {
-                    oxo_pileups.push(oxo);
-                } else if !oxo.is_monomorphic() && oxo.occurence_sufficient() {
-                    oxo_pileups.push(oxo);
-                }
+        if let Some(seq) = seq {
+            if !is_s(seq.as_bytes(), pos) {
+                continue 'pileups;
             }
-        };
+        }
+
+        let oxo = OxoPileup::new(
+            seq_name,
+            pileup,
+            opt.min_reads,
+            opt.quality,
+            opt.pseudocount,
+            seq,
+        );
+
+        if let Some(_) = opt.bcf {
+            oxo_var_dict.insert(oxo.desc(), oxo);
+        } else if opt.all {
+            oxo_pileups.push(oxo);
+        } else if !oxo.is_monomorphic() && oxo.occurence_sufficient() {
+            oxo_pileups.push(oxo);
+        }
     }
 
     if let Some(ref path) = opt.bcf {
-        let mut oxo_dict = HashMap::new();
-        for oxo in oxo_pileups.into_iter() {
-            oxo_dict.insert(oxo.desc(), oxo);
-        }
-
         let mut vcf = bcf::Reader::from_path(path)?;
+
         let header = HEADER_RECORDS.iter().fold(
             bcf::header::Header::from_template(&vcf.header()),
             |mut header, header_record| {
@@ -153,7 +153,7 @@ fn main() -> Result<()> {
         for record in vcf.records() {
             let mut record = record?;
             wrt.translate(&mut record);
-            if let Some(oxo) = oxo_dict.get(&record.desc()) {
+            if let Some(oxo) = oxo_var_dict.get(&record.desc()) {
                 update_vcf_record(
                     &mut record,
                     &oxo,
