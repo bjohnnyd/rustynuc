@@ -128,9 +128,6 @@ fn main() -> Result<()> {
     }
 
     if let Some(ref path) = opt.bcf {
-        // TODO: Implement methods to
-        // 1. Update VCF record if Oxo (filter and info fields)
-        // 2. Update header with the Oxo Info
         let mut oxo_dict = HashMap::new();
         for oxo in oxo_pileups.into_iter() {
             oxo_dict.insert(oxo.desc(), oxo);
@@ -146,7 +143,6 @@ fn main() -> Result<()> {
         );
 
         let mut wrt = bcf::Writer::from_stdout(&header, true, bcf::Format::VCF)?;
-        // let mut wrt_record = wrt.empty_record();
         let oxo_id = wrt.header().name_to_id(OXO_FILTER)?;
         let insufficient_filter = wrt.header().name_to_id(INSUFFICIENT_FILTER)?;
 
