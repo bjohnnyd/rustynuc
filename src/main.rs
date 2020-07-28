@@ -16,6 +16,10 @@ use rust_htslib::{bcf, bcf::header::Id, bcf::Read as VcfRead};
 use std::collections::{HashMap, HashSet};
 use structopt::StructOpt;
 
+//TODO:
+// 1. There is an issue when counting non-canonical alt as 8-oxoG and sufficient count
+// 2. Should add option to include non-canonical-alt/any-alt
+
 /// Nucleotide alphabet used
 pub const NUCLEOTIDES: [u8; 4] = [b'A', b'C', b'G', b'T'];
 /// Defualt visualization settings for track line

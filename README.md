@@ -123,7 +123,7 @@ If a VCF/BCF is provided the output will be in VCF format.  Multiple summaries a
 For each alternate allele, there are two AF provided so for example to filter the first alternate positions `AF_FF_FR[0]` and `AF_FF_FR[1]` can be used.  The command below will filter using the AF on FF/FR and also `FILTER=="PASS"` ensures only position with `p-val < 0.05` are returned.
 
 ```bash
-FILTERCMD='TYPE =="snp" && AF > 0.04 && FILTER=="PASS" && (AF_FF_FR=="." | (AF_FF_FR[0] >= 0.04 && AF_FF_FR[1] >= 0.04))'
+FILTERCMD='TYPE =="snp" && AF > 0.04 && FILTER=="PASS" && (FF_FR_AF=="." || (FF_FR_AF[0] >= 0.04 && FF_FR_AF[1] >= 0.04))'
 rustynuc --pseudocounts -r tests/input/ref.fa.gz --b tests/input/oxog.vcf.gz tests/alignments/oxog.bam | bcftools filter -Oz -i "$FILTERCMD" > nonoxog.vcf.gz
 ```
 
