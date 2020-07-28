@@ -6,10 +6,9 @@ mod alignment;
 mod cli;
 mod error;
 
-use crate::alignment::OxoPileup;
-use alignment::ReadType;
+use crate::alignment::{is_pos_iupac_s, OxoPileup};
+use alignment::Orientation;
 use bio::utils::Interval;
-use log::error;
 use rayon::prelude::*;
 use rust_htslib::{bam, bam::Read};
 use rust_htslib::{bcf, bcf::header::Id, bcf::Read as VcfRead};
@@ -62,21 +61,21 @@ fn main() -> Result<()> {
     let pileups = create_pileups(&mut bam, opt.threads, opt.max_depth)?;
     let mut oxo_pileups = Vec::new();
 
-    let mut seq_map = HashMap::new();
-    let mut bed_map = HashMap::new();
-    let mut variant_pos = HashSet::new();
-    let mut oxo_var_dict = HashMap::new();
+    let mut fasta_records = HashMap::new();
+    let mut regions = HashMap::new();
+    let mut vcf_positions = HashSet::new();
+    let mut oxo_check_locations = HashMap::new();
 
     if let Some(ref path) = opt.reference {
         let (rdr, _) = niffler::from_path(path)?;
         let fasta_rdr = bio::io::fasta::Reader::new(rdr);
-        seq_map = create_seq_map(fasta_rdr)?;
+        fasta_records = create_fasta_records(fasta_rdr)?;
     }
 
     if let Some(ref path) = opt.bed {
         let (rdr, _) = niffler::from_path(path)?;
         let bed_rdr = bio::io::bed::Reader::new(rdr);
-        create_bed_map(bed_rdr, &mut bed_map)?;
+        create_regions(bed_rdr, &mut regions)?;
     }
 
     if let Some(ref path) = opt.bcf {
@@ -84,8 +83,8 @@ fn main() -> Result<()> {
         for record in vcf.records() {
             let record = record?;
             let reference = record.alleles()[0];
-            if reference.len() == 1 && is_s(reference, 0) {
-                variant_pos.insert(record.desc());
+            if reference.len() == 1 && is_pos_iupac_s(reference, 0) {
+                vcf_positions.insert(record.desc());
             }
         }
     }
@@ -93,9 +92,9 @@ fn main() -> Result<()> {
     'pileups: for p in pileups {
         let pileup = p?;
         let pos = pileup.pos() as usize;
-        let seq_name = String::from_utf8(header.tid2name(pileup.tid()).to_vec())?;
-        if let Some(regions) = bed_map.get(&seq_name) {
-            if !regions
+        let chrom = String::from_utf8(header.tid2name(pileup.tid()).to_vec())?;
+        if let Some(chrom_regions) = regions.get(&chrom) {
+            if !chrom_regions
                 .par_iter()
                 .any(|region| region.contains(&(pos as u64)))
             {
@@ -103,20 +102,20 @@ fn main() -> Result<()> {
             }
         }
 
-        if !variant_pos.is_empty() && !variant_pos.contains(&format!("{}:{}", &seq_name, pos)) {
+        if !vcf_positions.is_empty() && !vcf_positions.contains(&format!("{}:{}", &chrom, pos)) {
             continue 'pileups;
         }
 
-        let seq = seq_map.get(&seq_name);
+        let seq = fasta_records.get(&chrom);
 
         if let Some(seq) = seq {
-            if !is_s(seq.as_bytes(), pos) {
+            if !is_pos_iupac_s(seq.as_bytes(), pos) {
                 continue 'pileups;
             }
         }
 
         let oxo = OxoPileup::new(
-            seq_name,
+            chrom,
             pileup,
             opt.min_reads,
             opt.quality,
@@ -125,7 +124,7 @@ fn main() -> Result<()> {
         );
 
         if let Some(_) = opt.bcf {
-            oxo_var_dict.insert(oxo.desc(), oxo);
+            oxo_check_locations.insert(oxo.desc(), oxo);
         } else if opt.all {
             oxo_pileups.push(oxo);
         } else if !oxo.is_monomorphic() && oxo.occurence_sufficient() {
@@ -153,7 +152,7 @@ fn main() -> Result<()> {
         for record in vcf.records() {
             let mut record = record?;
             wrt.translate(&mut record);
-            if let Some(oxo) = oxo_var_dict.get(&record.desc()) {
+            if let Some(oxo) = oxo_check_locations.get(&record.desc()) {
                 update_vcf_record(
                     &mut record,
                     &oxo,
@@ -166,9 +165,9 @@ fn main() -> Result<()> {
     } else {
         if calc_qval {
             oxo_pileups.sort_by(|a, b| {
-                a.min_p_value()
+                a.pval()
                     .expect("Could not calculate min pval")
-                    .partial_cmp(&b.min_p_value().expect("Could not calculate min pval"))
+                    .partial_cmp(&b.pval().expect("Could not calculate min pval"))
                     .expect("Could not compare the float values")
             });
         }
@@ -187,14 +186,14 @@ fn main() -> Result<()> {
             .par_iter()
             .enumerate()
             .map(|(rank, p)| {
-                let pval = p.min_p_value()?;
+                let pval = p.pval()?;
                 let mut corrected = String::from("");
                 if calc_qval {
                     let qval = (alpha * rank as f32) / m as f32;
                     let sig = if pval < qval as f64 { 1 } else { 0 };
                     corrected = format!("{}\t{}", qval, sig);
                 }
-                println!("{}\t{}", p.to_bed_entry()?, corrected);
+                println!("{}\t{}", p.to_bed_row()?, corrected);
                 Ok(())
             })
             .collect::<Result<Vec<()>>>();
@@ -215,21 +214,21 @@ fn create_pileups<'a>(
     Ok(pileups)
 }
 
-fn create_seq_map<T: std::io::Read>(
+fn create_fasta_records<T: std::io::Read>(
     rdr: bio::io::fasta::Reader<T>,
 ) -> Result<HashMap<String, String>> {
-    let mut seq_map = HashMap::<String, String>::new();
+    let mut fasta_records = HashMap::<String, String>::new();
     for record in rdr.records() {
         let record = record?;
-        seq_map.insert(
+        fasta_records.insert(
             record.id().to_string(),
             String::from_utf8(record.seq().to_vec())?,
         );
     }
-    Ok(seq_map)
+    Ok(fasta_records)
 }
 
-fn create_bed_map<T: std::io::Read>(
+fn create_regions<T: std::io::Read>(
     mut rdr: bio::io::bed::Reader<T>,
     map: &mut HashMap<String, Vec<Interval<u64>>>,
 ) -> Result<()> {
@@ -252,18 +251,6 @@ fn create_bed_map<T: std::io::Read>(
     Ok(())
 }
 
-fn is_s(seq: &[u8], pos: usize) -> bool {
-    if pos >= seq.len() {
-        error!("Reference sequence is shorter than BAM alignment positions");
-        std::process::exit(1)
-    } else {
-        match seq[pos] {
-            b'G' | b'C' | b'g' | b'c' => true,
-            _ => false,
-        }
-    }
-}
-
 fn update_vcf_record(
     record: &mut bcf::Record,
     oxo: &OxoPileup,
@@ -271,9 +258,9 @@ fn update_vcf_record(
     sig_threshold: f64,
 ) -> Result<()> {
     let counts = oxo
-        .nuc_counts(ReadType::FF)
+        .nuc_counts(Orientation::FF)
         .iter()
-        .zip(oxo.nuc_counts(ReadType::FR))
+        .zip(oxo.nuc_counts(Orientation::FR))
         .enumerate()
         .map(|(i, (ff_count, fr_count))| {
             let counts = [
@@ -284,7 +271,7 @@ fn update_vcf_record(
         })
         .collect::<HashMap<u8, [i32; 2]>>();
 
-    record.push_info_integer(b"OXO_DEPTH", &[oxo.ref_depth as i32])?;
+    record.push_info_integer(b"OXO_DEPTH", &[oxo.depth as i32])?;
     record.push_info_integer(
         b"ADENINE_FF_FR",
         counts.get(&b'A').unwrap_or_else(|| &[0, 0]),
@@ -302,8 +289,8 @@ fn update_vcf_record(
         counts.get(&b'T').unwrap_or_else(|| &[0, 0]),
     )?;
 
-    let ac_pval = oxo.get_pval(b'C')?;
-    let gt_pval = oxo.get_pval(b'G')?;
+    let ac_pval = oxo.get_nuc_pval(b'C')?;
+    let gt_pval = oxo.get_nuc_pval(b'G')?;
     let is_oxog = ac_pval < sig_threshold || gt_pval < sig_threshold;
     record.push_info_float(b"A_C_PVAL", &[ac_pval as f32])?;
     record.push_info_float(b"G_T_PVAL", &[gt_pval as f32])?;
