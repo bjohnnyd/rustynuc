@@ -26,22 +26,22 @@ pub const TRACK_LINE: &str = "#coords 0";
 /// Header information added to VCF
 pub const HEADER_RECORDS: [&[u8]; 11] = [
     br#"##FILTER=<ID=OxoG,Description="OxoG two-sided p-value < 0.05">"#,
-    br#"##FILTER=<ID=OccurenceInsufficient,Description="There is not a sufficient number of reads aligning in the FF and FR orientation">"#,
+    br#"##FILTER=<ID=InsufficientCount,Description="Insufficient number of reads aligning in the FF or FR orientation">"#,
     br#"##INFO=<ID=OXO_DEPTH,Number=1,Type=Integer,Description="OxoG Pileup Depth">"#,
-    br#"##INFO=<ID=ADENINE_FF_FR,Number=2,Type=Integer,Description="Adenine counts at FF and FR">"#,
-    br#"##INFO=<ID=CYTOSINE_FF_FR,Number=2,Type=Integer,Description="Cytosine counts at FF and FR">"#,
-    br#"##INFO=<ID=GUANINE_FF_FR,Number=2,Type=Integer,Description="Guanine counts at FF and FR">"#,
-    br#"##INFO=<ID=THYMINE_FF_FR,Number=2,Type=Integer,Description="Thymine counts at FF and FR">"#,
-    br#"##INFO=<ID=A_C_PVAL,Number=1,Type=Float,Description="A/C two-sided p-value">"#,
-    br#"##INFO=<ID=G_T_PVAL,Number=1,Type=Float,Description="G/T two-sided p-value">"#,
-    br#"##INFO=<ID=AF_FF_FR,Number=A,Type=Float,Description="Alternate frequency calculations on the FF and FR">"#,
-    br#"##INFO=<ID=OXO_CONTEXT,Number=1,Type=String,Description="3mer Context of reference">"#,
+    br#"##INFO=<ID=ADENINE_FF_FR,Number=2,Type=Integer,Description="Adenine counts in FF and FR orientations">"#,
+    br#"##INFO=<ID=CYTOSINE_FF_FR,Number=2,Type=Integer,Description="Cytosine counts in FF and FR orientations">"#,
+    br#"##INFO=<ID=GUANINE_FF_FR,Number=2,Type=Integer,Description="Guanine counts in FF and FR orientations">"#,
+    br#"##INFO=<ID=THYMINE_FF_FR,Number=2,Type=Integer,Description="Thymine counts in FF and FR orientations">"#,
+    br#"##INFO=<ID=AC_PVAL,Number=1,Type=Float,Description="A/C two-sided p-value">"#,
+    br#"##INFO=<ID=GT_PVAL,Number=1,Type=Float,Description="G/T two-sided p-value">"#,
+    br#"##INFO=<ID=FF_FR_AF,Number=A,Type=Float,Description="Alternate frequency calculations on the FF and FR">"#,
+    br#"##INFO=<ID=OXO_CONTEXT,Number=1,Type=String,Description="3mer reference sequence context">"#,
 ];
 
 /// Name for significant filter
 pub const OXO_FILTER: &[u8] = b"OxoG";
 /// Name for insufficient counts filter
-pub const INSUFFICIENT_FILTER: &[u8] = b"OccurenceInsufficient";
+pub const INSUFFICIENT_FILTER: &[u8] = b"InsufficientCount";
 
 type Result<T> = std::result::Result<T, crate::error::Error>;
 
@@ -292,8 +292,8 @@ fn update_vcf_record(
     let ac_pval = oxo.get_nuc_pval(b'C')?;
     let gt_pval = oxo.get_nuc_pval(b'G')?;
     let is_oxog = ac_pval < sig_threshold || gt_pval < sig_threshold;
-    record.push_info_float(b"A_C_PVAL", &[ac_pval as f32])?;
-    record.push_info_float(b"G_T_PVAL", &[gt_pval as f32])?;
+    record.push_info_float(b"AC_PVAL", &[ac_pval as f32])?;
+    record.push_info_float(b"GT_PVAL", &[gt_pval as f32])?;
 
     if let Some(ref seq) = oxo.context {
         record.push_info_string(b"OXO_CONTEXT", &[seq])?;
@@ -324,7 +324,7 @@ fn update_vcf_record(
                         oxo_af
                     });
 
-            record.push_info_float(b"AF_FF_FR", oxo_af.as_slice())?;
+            record.push_info_float(b"FF_FR_AF", oxo_af.as_slice())?;
         }
         _ => {}
     }

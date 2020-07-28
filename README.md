@@ -105,19 +105,19 @@ rustynuc -r tests/input/ref.fa.gz tests/alignments/oxog.bam | awk '$12 < 0.05 ||
 
 If a VCF/BCF is provided the output will be in VCF format.  Multiple summaries are provided in the VCF file:
 
-```
-##FILTER=<ID=OxoG,Description="OxoG two-sided p-value < 0.05">,
-##FILTER=<ID=OccurenceInsufficient,Description="There is not a sufficient number of reads aligning in the FF and FR orientation">,
-##INFO=<ID=OXO_DEPTH,Number=1,Type=Integer,Description="OxoG Pileup Depth">,
-##INFO=<ID=ADENINE_FF_FR,Number=2,Type=Integer,Description="Adenine counts at FF and FR">,
-##INFO=<ID=CYTOSINE_FF_FR,Number=2,Type=Integer,Description="Cytosine counts at FF and FR">,
-##INFO=<ID=GUANINE_FF_FR,Number=2,Type=Integer,Description="Guanine counts at FF and FR">,
-##INFO=<ID=THYMINE_FF_FR,Number=2,Type=Integer,Description="Thymine counts at FF and FR">,
-##INFO=<ID=A_C_PVAL,Number=1,Type=Float,Description="A/C two-sided p-value">,
-##INFO=<ID=G_T_PVAL,Number=1,Type=Float,Description="G/T two-sided p-value">,
-##INFO=<ID=AF_FF_FR,Number=A,Type=Float,Description="Alternate frequency calculations on the FF and FR">,
-##INFO=<ID=OXO_CONTEXT,Number=1,Type=String,Description="3mer Context of reference">,
-```
+| TYPE | ID | Description  |
+| :-----------------------------: | :-----------------------------: | :-------------------------------------: |
+| FILTER | OxoG   | OxoG two-sided p-value < 0.05 |
+| FILTER | InsufficientCount   | Insufficient number of reads aligning in the FF or FR orientation |
+| INFO | OXO_DEPTH   | OxoG Pileup Depth |
+| INFO | ADENINE_FF_FR   | Adenine counts in FF and FR orientations |
+| INFO | CYTOSINE_FF_FR   | Cytosine counts in FF and FR orientations |
+| INFO | GUANINE_FF_FR   | Guanine counts at FF and FR orientations |
+| INFO | THYMINE_FF_FR   | Thymine counts at FF and FR orientations |
+| INFO | AC_PVAL   | A/C two-sided p-value |
+| INFO | GT_PVAL   | G/C two-sided p-value |
+| INFO | FF_FR_AF   | Alternate frequency calculations on the FF and FR (2 values for each alternate allele) |
+| INFO | OXO_CONTEXT   | 3mer reference sequence context |
 
 `AF_FF_FR` can be used to filter based on AF on the `FF` or `FR` orientations.  
 
