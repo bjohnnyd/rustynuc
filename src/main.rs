@@ -9,15 +9,12 @@ mod error;
 use crate::alignment::{is_pos_iupac_s, OxoPileup};
 use alignment::Orientation;
 use bio::utils::Interval;
+use log::{debug, error, info, warn};
 use rayon::prelude::*;
 use rust_htslib::{bam, bam::Read};
 use rust_htslib::{bcf, bcf::header::Id, bcf::Read as VcfRead};
 use std::collections::{HashMap, HashSet};
 use structopt::StructOpt;
-
-// TODO:
-// 1. Examples like 581774 where the primary alt is oxo-g but the secondary is real (might be
-//    better to label with a different filter like MultiOxoG)
 
 /// Nucleotide alphabet used
 pub const NUCLEOTIDES: [u8; 4] = [b'A', b'C', b'G', b'T'];
@@ -46,6 +43,16 @@ pub const INSUFFICIENT_FILTER: &[u8] = b"InsufficientCount";
 type Result<T> = std::result::Result<T, crate::error::Error>;
 
 fn main() -> Result<()> {
+    match main_try() {
+        Ok(()) => Ok(()),
+        Err(e) => {
+            error!("{}", e);
+            Err(e)
+        }
+    }
+}
+
+fn main_try() -> Result<()> {
     let opt = cli::RustyNuc::from_args();
     opt.set_logging();
     let alpha = opt.alpha;
@@ -67,37 +74,59 @@ fn main() -> Result<()> {
     let mut oxo_check_locations = HashMap::new();
 
     if let Some(ref path) = opt.reference {
+        info!("Reading reference...");
         let (rdr, _) = niffler::from_path(path)?;
         let fasta_rdr = bio::io::fasta::Reader::new(rdr);
         fasta_records = create_fasta_records(fasta_rdr)?;
     }
 
     if let Some(ref path) = opt.bed {
+        info!("Reading regions...");
         let (rdr, _) = niffler::from_path(path)?;
         let bed_rdr = bio::io::bed::Reader::new(rdr);
         create_regions(bed_rdr, &mut regions)?;
     }
 
     if let Some(ref path) = opt.bcf {
+        info!("Reading VCF...");
         let mut vcf = bcf::Reader::from_path(path)?;
-        for record in vcf.records() {
+        for (i, record) in vcf.records().enumerate() {
+            debug!("Accesing {} record in the VCF...", i + 1);
             let record = record?;
             let reference = record.alleles()[0];
+            debug!(
+                "Succesfully obtained description {} with reference allele {}",
+                record.desc(),
+                String::from_utf8(reference.to_vec())?
+            );
             if reference.len() == 1 && is_pos_iupac_s(reference, 0) {
+                debug!(
+                    "Record {} in the VCF will be processed for potential 8-oxoG",
+                    i + 1
+                );
                 vcf_positions.insert(record.desc());
             }
         }
     }
 
+    info!("Started pileup analysis...");
     'pileups: for p in pileups {
         let pileup = p?;
         let pos = pileup.pos() as usize;
         let chrom = String::from_utf8(header.tid2name(pileup.tid()).to_vec())?;
+        debug!(
+            "Processing pileup on chromosome {} at position {}...",
+            &chrom, pos
+        );
         if let Some(chrom_regions) = regions.get(&chrom) {
             if !chrom_regions
                 .par_iter()
                 .any(|region| region.contains(&(pos as u64)))
             {
+                debug!(
+                    "Pileup {}:{} is outside of the provided BED regions and will be skipped",
+                    &chrom, pos
+                );
                 continue 'pileups;
             }
         }
@@ -110,6 +139,7 @@ fn main() -> Result<()> {
 
         if let Some(seq) = seq {
             if !is_pos_iupac_s(seq.as_bytes(), pos) {
+                debug!("Pileup {}:{} is not G/C and will be skipped", &chrom, pos);
                 continue 'pileups;
             }
         }
@@ -126,8 +156,10 @@ fn main() -> Result<()> {
         if let Some(_) = opt.bcf {
             oxo_check_locations.insert(oxo.desc(), oxo);
         } else if opt.all {
+            debug!("Pileup {}:{} will be analysed for 8-oxoG", &oxo.chrom, pos);
             oxo_pileups.push(oxo);
         } else if !oxo.is_monomorphic() && oxo.occurence_sufficient() {
+            debug!("Pileup {}:{} will be analysed for 8-oxoG", &oxo.chrom, pos);
             oxo_pileups.push(oxo);
         }
     }
@@ -149,10 +181,12 @@ fn main() -> Result<()> {
 
         wrt.set_threads(opt.threads)?;
 
+        info!("Started processing VCF file variants...");
         for record in vcf.records() {
             let mut record = record?;
             wrt.translate(&mut record);
             if let Some(oxo) = oxo_check_locations.get(&record.desc()) {
+                debug!("Updating VCF information for {}", record.desc());
                 update_vcf_record(
                     &mut record,
                     &oxo,
@@ -164,6 +198,7 @@ fn main() -> Result<()> {
         }
     } else {
         if calc_qval {
+            info!("Ranking p-values...");
             oxo_pileups.sort_by(|a, b| {
                 a.pval()
                     .expect("Could not calculate min pval")
@@ -182,6 +217,7 @@ fn main() -> Result<()> {
             println!("{}", TRACK_LINE);
         }
 
+        info!("Started adj.p-value calculation and output processing...");
         let _ = oxo_pileups
             .par_iter()
             .enumerate()
@@ -199,6 +235,7 @@ fn main() -> Result<()> {
             .collect::<Result<Vec<()>>>();
     }
 
+    info!("Done!");
     Ok(())
 }
 

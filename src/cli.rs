@@ -40,10 +40,14 @@ pub(crate) struct RustyNuc {
         help = "Optional reference which will be used to determine sequence context and type of change"
     )]
     pub(crate) reference: Option<PathBuf>,
-    #[structopt(short, long, help = "Whether to just print results for all positions")]
+    #[structopt(
+        short,
+        long,
+        help = "Whether to process and print information for every position in the BAM file"
+    )]
     pub(crate) all: bool,
     #[structopt(
-        help = "Alignments to correct for possible 8-oxoG damage",
+        help = "Alignments to investigate for possible 8-oxoG damage",
         required = true,
         parse(from_os_str)
     )]
@@ -51,7 +55,7 @@ pub(crate) struct RustyNuc {
     #[structopt(
         short,
         long,
-        help = "Whether to use pseudocounts (adds +1 to all counts) when calculating statistics"
+        help = "Whether to use pseudocounts (increments all counts by 1) when calculating statistics"
     )]
     pub(crate) pseudocount: bool,
     #[structopt(
@@ -67,7 +71,7 @@ pub(crate) struct RustyNuc {
     #[structopt(
         short,
         long,
-        help = "BCF/VCF of variants called on the supplied alignment file"
+        help = "BCF/VCF for variants called on the supplied alignment file"
     )]
     pub(crate) bcf: Option<PathBuf>,
 }

@@ -1,21 +1,21 @@
 use thiserror::Error;
 
 #[derive(Debug, Error)]
-/// Errors of which majority are related to I/O issues
+/// Errors of which majority are related to I/O issues or incorrect file format errors
 pub enum Error {
     #[error("Could not read FASTA record")]
     /// Could not read an entry in a fasta file
     FastaRecordError(#[from] std::io::Error),
-    #[error("Could not convert bytes as it is invalid UTF-8")]
+    #[error("Could not convert bytes in FASTA as it is invalid UTF-8")]
     /// Data is not in UTF-8 format
     NotUTF8(#[from] std::string::FromUtf8Error),
-    #[error("Could not process the BAM file")]
+    #[error("Could not read/process the BAM file")]
     /// Bam Reading Error
     BamError(#[from] rust_htslib::bam::Error),
     #[error("Count too large for statistical testing")]
     /// Fisher's exact error
     FishersError(#[from] fishers_exact::TooLargeValueError),
-    #[error("Could not create a reader for the FASTA file")]
+    #[error("Could not create read FASTA file")]
     /// Read FASTA error
     FastaError(#[from] niffler::Error),
     #[error("Could not spawn threads")]

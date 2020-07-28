@@ -48,17 +48,17 @@ USAGE:
     rustynuc [FLAGS] [OPTIONS] <bam>
 
 FLAGS:
-    -a, --all                Whether to just print results for all positions
+    -a, --all                Whether to process and print information for every position in the BAM file
     -h, --help               Prints help information
     -n, --no-qval            Skip calculating qvalue
-    -p, --pseudocount        Whether to use pseudocounts (adds +1 to all counts) when calculating statistics
+    -p, --pseudocount        Whether to use pseudocounts (increments all counts by 1) when calculating statistics
     -V, --version            Prints version information
     -v, --verbosity          Determines verbosity of the processing, can be specified multiple times -vvv
     -w, --with-track-line    Include track line (for correct visualization with IGV)
 
 OPTIONS:
         --alpha <alpha>              FDR threshold [default: 0.2]
-    -b, --bcf <bcf>                  BCF/VCF of variants called on the supplied alignment file
+    -b, --bcf <bcf>                  BCF/VCF for variants called on the supplied alignment file
         --bed <bed>                  A BED file to restrict analysis to specific regions
         --fisher-sig <fisher-sig>    Significance threshold for Fisher's test [default: 0.05]
         --max-depth <max-depth>      Maximum pileup depth to use [default: 1000]
@@ -70,8 +70,7 @@ OPTIONS:
     -t, --threads <threads>          Number of threads [default: 4]
 
 ARGS:
-    <bam>    Alignments to correct for possible 8-oxoG damage
-
+    <bam>    Alignments to investigate for possible 8-oxoG damage
 ```
 
 ### Output
@@ -144,6 +143,13 @@ The MIT License (MIT). Please see [License File](LICENSE.md) for more informatio
 - fisher's exact is affected heavily by 0 counts so `pseudocounts` can be used
 - fisher's exact test is fairly conservative so might underestimate the true numbers
 - FDR will be heavily dependent on %GC of the genome, size of the genome, whether a reference was provided, a VCF is provided or the test was restricted to specific regions. 
+
+## Bio Rust Crates
+
+The heavy lifting is done by the following crates:
+
+- the crucial [rust-htslib](https://github.com/rust-bio/rust-htslib)
+- the nifty [niffler](https://github.com/luizirber/niffler)
 
 [ico-version]: https://img.shields.io/github/v/release/bjohnnyd/rustynuc?include_prereleases&style=flat-square
 [ico-license]: https://img.shields.io/github/license/bjohnnyd/rustynuc?color=purple&style=flat-square

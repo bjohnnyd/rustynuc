@@ -5,7 +5,6 @@ authors = ["Johnny Debebe johnny.debebe@nottingham.ac.uk"]
 edition = "2018"
 publish = false
 
-
 [dependencies.niffler]
 version = "2.2.0"
 default-features = false 
