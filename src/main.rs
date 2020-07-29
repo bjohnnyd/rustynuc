@@ -16,10 +16,6 @@ use rust_htslib::{bcf, bcf::header::Id, bcf::Read as VcfRead};
 use std::collections::{HashMap, HashSet};
 use structopt::StructOpt;
 
-//TODO:
-// 1. There is an issue when counting non-canonical alt as 8-oxoG and sufficient count
-// 2. Should add option to include non-canonical-alt/any-alt
-
 /// Nucleotide alphabet used
 pub const NUCLEOTIDES: [u8; 4] = [b'A', b'C', b'G', b'T'];
 /// Defualt visualization settings for track line
@@ -189,16 +185,23 @@ fn main_try() -> Result<()> {
         for record in vcf.records() {
             let mut record = record?;
             wrt.translate(&mut record);
-            if let Some(oxo) = oxo_check_locations.get(&record.desc()) {
-                debug!("Updating VCF information for {}", record.desc());
-                update_vcf_record(
-                    &mut record,
-                    &oxo,
-                    (oxo_id, insufficient_filter),
-                    opt.fisher_sig,
-                )?;
+            let ref_allele = record.alleles()[0].to_ascii_uppercase()[0];
+            match oxo_check_locations.get(&record.desc()) {
+                Some(oxo)
+                    if !oxo.is_monomorphic()
+                        && oxo.nuc_sufficient(ref_allele).iter().all(|x| *x) =>
+                {
+                    debug!("Updating VCF information for {}", record.desc());
+                    update_vcf_record(
+                        &mut record,
+                        &oxo,
+                        (oxo_id, insufficient_filter),
+                        opt.fisher_sig,
+                    )?
+                }
+                _ => {}
             }
-            wrt.write(&record)?;
+            wrt.write(&record)?
         }
     } else {
         if calc_qval {
@@ -344,9 +347,7 @@ fn update_vcf_record(
         record.push_filter(filter_id.0)
     };
 
-    if !oxo.occurence_sufficient() {
-        record.push_filter(filter_id.1)
-    }
+    let mut insufficient_count = false;
 
     match record.alleles()[0] {
         ref_allele if ref_allele == b"G" || ref_allele == b"C" => {
@@ -360,15 +361,24 @@ fn update_vcf_record(
                         let ref_counts = counts.get(&ref_allele[0]).unwrap_or_else(|| &[1, 1]);
                         let ff_af = alt_counts[0] as f32 / ref_counts[0] as f32;
                         let fr_af = alt_counts[1] as f32 / ref_counts[1] as f32;
+                        match (ref_allele, alt_allele) {
+                            (b"G", b"T") | (b"C", b"A") if !oxo.occurence_sufficient() => {
+                                insufficient_count = true
+                            }
+                            _ => {}
+                        }
                         oxo_af.push(ff_af);
                         oxo_af.push(fr_af);
                         oxo_af
                     });
 
+            if insufficient_count {
+                debug!("Record {} has insufficient count", record.desc());
+                record.push_filter(filter_id.1)
+            };
             record.push_info_float(b"FF_FR_AF", oxo_af.as_slice())?;
         }
         _ => {}
     }
-
     Ok(())
 }

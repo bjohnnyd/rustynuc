@@ -1,6 +1,6 @@
 use crate::error::Error;
 use fishers_exact::fishers_exact;
-use log::error;
+use log::{debug, error};
 use rust_htslib::bam::pileup::Pileup;
 use std::collections::HashMap;
 
@@ -73,6 +73,16 @@ impl OxoPileup {
         }
     }
 
+    /// Checks if specific nucleotide is at sufficient numbers `[ff, fr]`
+    pub fn nuc_sufficient(&self, nuc: u8) -> [bool; 2] {
+        debug!("Counting nucleotide {}", nuc as char);
+        let nuc = nuc.to_ascii_uppercase() as usize;
+        let ff_count = self.ff_count[nuc] + self.ff_count[nuc + 32];
+        let fr_count = self.fr_count[nuc] + self.fr_count[nuc + 32];
+        debug!("{} in ff and {} in fr", ff_count, fr_count);
+        [ff_count >= self.min_count, fr_count >= self.min_count]
+    }
+
     /// Returns the counts of A, C, G and T
     pub fn nuc_counts(&self, orientation: Orientation) -> Vec<u32> {
         crate::NUCLEOTIDES
@@ -102,7 +112,9 @@ impl OxoPileup {
         self.nuc_counts(Orientation::FF)
             .into_iter()
             .zip(self.nuc_counts(Orientation::FR).into_iter())
-            .filter(|(ff_count, fr_count)| *ff_count > self.min_count || *fr_count > self.min_count)
+            .filter(|(ff_count, fr_count)| {
+                *ff_count >= self.min_count || *fr_count >= self.min_count
+            })
             .count()
             > 1
     }

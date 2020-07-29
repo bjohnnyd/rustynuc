@@ -144,12 +144,9 @@ The MIT License (MIT). Please see [License File](LICENSE.md) for more informatio
 - fisher's exact test is fairly conservative so might underestimate the true numbers
 - FDR will be heavily dependent on %GC of the genome, size of the genome, whether a reference was provided, a VCF is provided or the test was restricted to specific regions. 
 
-## Bio Rust Crates
+##  Crates to Credit
 
-The heavy lifting is done by the following crates:
-
-- the crucial [rust-htslib](https://github.com/rust-bio/rust-htslib)
-- the nifty [niffler](https://github.com/luizirber/niffler)
+Credit goes to [rust-htslib](https://github.com/rust-bio/rust-htslib) and [niffler](https://github.com/luizirber/niffler) crates.
 
 [ico-version]: https://img.shields.io/github/v/release/bjohnnyd/rustynuc?include_prereleases&style=flat-square
 [ico-license]: https://img.shields.io/github/license/bjohnnyd/rustynuc?color=purple&style=flat-square
