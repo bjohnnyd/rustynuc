@@ -146,7 +146,7 @@ The MIT License (MIT). Please see [License File](LICENSE.md) for more informatio
 
 ##  Crates to Credit
 
-Credit goes to [rust-htslib](https://github.com/rust-bio/rust-htslib) and [niffler](https://github.com/luizirber/niffler) crates.
+Implemented using the [rust-htslib](https://github.com/rust-bio/rust-htslib) and [niffler](https://github.com/luizirber/niffler) crates.
 
 [ico-version]: https://img.shields.io/github/v/release/bjohnnyd/rustynuc?include_prereleases&style=flat-square
 [ico-license]: https://img.shields.io/github/license/bjohnnyd/rustynuc?color=purple&style=flat-square
