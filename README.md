@@ -149,17 +149,27 @@ The MIT License (MIT). Please see [License File](LICENSE.md) for more informatio
 
 Implemented using the [rust-htslib](https://github.com/rust-bio/rust-htslib) and [niffler](https://github.com/luizirber/niffler) crates.
 
+## Citing
+
+If used in published research, a citation is appreciated:
+
+[![DOI][ico-doi]][link-doi]
+
+> Debebe, Bisrat J: Quick analysis of pileups for likely 8-oxoG locations. (2020). doi:10.5281/zenodo.4157557
+
 [ico-version]: https://img.shields.io/github/v/release/bjohnnyd/rustynuc?include_prereleases&style=flat-square
 [ico-license]: https://img.shields.io/github/license/bjohnnyd/rustynuc?color=purple&style=flat-square
 [ico-travis]: https://img.shields.io/travis/com/bjohnnyd/rustynuc?style=flat-square
 [ico-downloads]: https://img.shields.io/packagist/dt/:vendor/rustynuc.svg?style=flat-square
 [ico-bioconda]: https://img.shields.io/badge/install%20with-bioconda-brightgreen.svg?style=flat
+[ico-doi]: https://zenodo.org/badge/DOI/10.5281/zenodo.4157557.svg
 
 [link-version]: https://github.com/bjohnnyd/rustynuc/releases/latest
 [link-travis]: https://travis-ci.com/bjohnnyd/rustynuc
 [link-downloads]: https://packagist.org/packages/bjohnnyd/rustynuc
 [link-author]: https://github.com/bjohnnyd
 [link-bioconda]: http://bioconda.github.io/recipes/rustynuc/README.html
+[link-doi]: https://doi.org/10.5281/zenodo.4157557
 
 [linux-tar]: https://github.com/bjohnnyd/rustynuc/releases/latest/download/x86_64-unknown-linux-gnu.tar.gz
 [linux-zip]: https://github.com/bjohnnyd/rustynuc/releases/latest/download/x86_64-unknown-linux-gnu.zip
