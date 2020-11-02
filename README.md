@@ -10,6 +10,14 @@ Tool to calculate the likelihood of 8-oxoG damage based on alignment characteris
 
 ## Install
 
+### Conda 
+
+To install with conda:
+
+``` bash
+conda install -c bioconda rustynuc
+```
+
 ### Binary
 
 Precompiled binaries are provided below:
