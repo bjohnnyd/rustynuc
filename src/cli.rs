@@ -74,6 +74,11 @@ pub(crate) struct RustyNuc {
         help = "BCF/VCF for variants called on the supplied alignment file"
     )]
     pub(crate) bcf: Option<PathBuf>,
+    #[structopt(
+        long,
+        help = "Do not count overlapping mates when calculating total depth"
+    )]
+    pub(crate) no_overlapping: bool,
 }
 
 impl RustyNuc {

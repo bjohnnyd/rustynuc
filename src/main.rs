@@ -151,6 +151,7 @@ fn main_try() -> Result<()> {
             opt.quality,
             opt.pseudocount,
             seq,
+            opt.no_overlapping,
         );
 
         if let Some(_) = opt.bcf {

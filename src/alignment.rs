@@ -33,8 +33,9 @@ impl OxoPileup {
         min_qual: u8,
         pseudocount: bool,
         seq: Option<T>,
+        no_overlapping: bool,
     ) -> Self {
-        let depth = pileup.depth();
+        let mut depth = 0;
         let pos = pileup.pos();
         let pseudocount = if pseudocount { 1 } else { 0 };
         let context = match seq {
@@ -58,7 +59,19 @@ impl OxoPileup {
                         ff_count[base as usize] += 1;
                     }
                 }
+
+                if no_overlapping {
+                    if record.insert_size() <= 0 && !record.is_first_in_template() {
+                        continue;
+                    } else {
+                        depth += 1;
+                    }
+                }
             }
+        }
+
+        if !no_overlapping {
+            depth = pileup.depth()
         }
 
         Self {
