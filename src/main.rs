@@ -360,8 +360,10 @@ fn update_vcf_record(
                     .fold(Vec::new(), |mut oxo_af, alt_allele| {
                         let alt_counts = counts.get(&alt_allele[0]).unwrap_or_else(|| &[0, 0]);
                         let ref_counts = counts.get(&ref_allele[0]).unwrap_or_else(|| &[1, 1]);
-                        let ff_af = alt_counts[0] as f32 / ref_counts[0] as f32;
-                        let fr_af = alt_counts[1] as f32 / ref_counts[1] as f32;
+                        let ff_af =
+                            alt_counts[0] as f32 / (ref_counts[0] as f32 + alt_counts[0] as f32);
+                        let fr_af =
+                            alt_counts[1] as f32 / (ref_counts[1] as f32 + alt_counts[1] as f32);
                         match (ref_allele, alt_allele) {
                             (b"G", b"T") | (b"C", b"A") if !oxo.occurence_sufficient() => {
                                 insufficient_count = true
