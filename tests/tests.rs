@@ -8,6 +8,15 @@ lazy_static! {
     static ref FF_FR_AF_REGEX: Regex = Regex::new("FF_FR_AF=(.+?),(.+?)\t").unwrap();
 }
 
+fn extract_filter(output: &[u8]) -> String {
+    String::from_utf8(output.to_vec())
+        .unwrap()
+        .lines()
+        .filter(|l| !l.starts_with("#"))
+        .flat_map(|l| l.split("\t").skip(6).next())
+        .collect()
+}
+
 #[test]
 fn cli_no_args() {
     Command::cargo_bin("rustynuc").unwrap().assert().failure();
@@ -77,10 +86,10 @@ fn cli_af_not_above_one() {
         .args(&[
             "--all",
             "-r",
-            "tests/input/ref.fa.gz",
+            "tests/input/high_af/high_af.oxog.ref.fa.gz",
             "-b",
-            "tests/input/high_af.oxog.vcf.gz",
-            "tests/input/high_af.oxog.bam",
+            "tests/input/high_af/high_af.oxog.vcf.gz",
+            "tests/input/high_af/high_af.oxog.bam",
         ])
         .unwrap()
         .stdout;
@@ -91,4 +100,43 @@ fn cli_af_not_above_one() {
     } else {
         panic!("No FF_FR_AF in output")
     }
+}
+
+#[test]
+fn cli_not_oxog_as_above_ff_fr_threshold() {
+    let output = Command::cargo_bin("rustynuc")
+        .unwrap()
+        .args(&[
+            "-r",
+            "tests/input/high_af/high_af.oxog.ref.fa.gz",
+            "-b",
+            "tests/input/high_af/high_af.oxog.vcf.gz",
+            "tests/input/high_af/high_af.oxog.bam",
+        ])
+        .unwrap()
+        .stdout;
+
+    let filter_result = extract_filter(&output);
+    assert_eq!(filter_result, "PASS".to_string())
+}
+
+#[test]
+fn cli_oxog_false_positive_as_below_ff_fr_threshold() {
+    let output = Command::cargo_bin("rustynuc")
+        .unwrap()
+        .args(&[
+            "--fishers-af",
+            "0.6",
+            "-r",
+            "tests/input/high_af/high_af.oxog.ref.fa.gz",
+            "-b",
+            "tests/input/high_af/high_af.oxog.vcf.gz",
+            "tests/input/high_af/high_af.oxog.bam",
+        ])
+        .unwrap()
+        .stdout;
+
+    let filter_result = extract_filter(&output);
+
+    assert_eq!(filter_result, "OxoG".to_string());
 }

@@ -31,9 +31,15 @@ pub(crate) struct RustyNuc {
         help = "Significance threshold for Fisher's test",
         default_value = "0.05"
     )]
-    pub(crate) fisher_sig: f64,
+    pub(crate) fishers_sig: f64,
     #[structopt(long, help = "FDR threshold", default_value = "0.2")]
     pub(crate) alpha: f32,
+    #[structopt(
+        long,
+        help = "AF on both the ff and fr at which point to not apply Fisher's exact pval filter in VCF",
+        default_value = "0.1"
+    )]
+    pub(crate) fishers_af: f32,
     #[structopt(
         short,
         long,
