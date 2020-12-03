@@ -199,6 +199,7 @@ fn main_try() -> Result<()> {
                         (oxo_id, insufficient_filter),
                         opt.fishers_sig,
                         opt.fishers_af,
+                        opt.oxo_af_ceiling,
                     )?
                 }
                 _ => {}

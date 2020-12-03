@@ -121,12 +121,35 @@ fn cli_not_oxog_as_above_ff_fr_threshold() {
 }
 
 #[test]
-fn cli_oxog_false_positive_as_below_ff_fr_threshold() {
+fn cli_oxog_false_positive_below_ff_fr_threshold_but_above_ceiling() {
     let output = Command::cargo_bin("rustynuc")
         .unwrap()
         .args(&[
             "--fishers-af",
             "0.6",
+            "-r",
+            "tests/input/high_af/high_af.oxog.ref.fa.gz",
+            "-b",
+            "tests/input/high_af/high_af.oxog.vcf.gz",
+            "tests/input/high_af/high_af.oxog.bam",
+        ])
+        .unwrap()
+        .stdout;
+
+    let filter_result = extract_filter(&output);
+
+    assert_eq!(filter_result, "PASS".to_string());
+}
+
+#[test]
+fn cli_oxog_false_positive_below_ff_fr_threshold_and_below_ceiling() {
+    let output = Command::cargo_bin("rustynuc")
+        .unwrap()
+        .args(&[
+            "--fishers-af",
+            "0.6",
+            "--oxo-af-ceiling",
+            "1",
             "-r",
             "tests/input/high_af/high_af.oxog.ref.fa.gz",
             "-b",

@@ -1,4 +1,5 @@
 use crate::alignment::{Orientation, OxoPileup};
+use crate::Result;
 use crate::NUCLEOTIDES;
 use log::debug;
 use rust_htslib::{bcf, bcf::header::Id};
@@ -24,14 +25,13 @@ pub const OXO_FILTER: &[u8] = b"OxoG";
 /// Name for insufficient counts filter
 pub const INSUFFICIENT_FILTER: &[u8] = b"InsufficientCount";
 
-type Result<T> = std::result::Result<T, crate::error::Error>;
-
 pub fn update_vcf_record(
     record: &mut bcf::Record,
     oxo: &OxoPileup,
     filter_id: (Id, Id),
     sig_threshold: f64,
     ff_fr_threshold: f32,
+    oxo_ceiling: f32,
 ) -> Result<()> {
     let counts = oxo
         .nuc_counts(Orientation::FF)
@@ -92,7 +92,8 @@ pub fn update_vcf_record(
                             alt_counts[0] as f32 / (ref_counts[0] as f32 + alt_counts[0] as f32);
                         let fr_af =
                             alt_counts[1] as f32 / (ref_counts[1] as f32 + alt_counts[1] as f32);
-                        above_ff_fr_threshold = ff_af > ff_fr_threshold && fr_af > ff_fr_threshold;
+                        above_ff_fr_threshold = (ff_af > oxo_ceiling || fr_af > oxo_ceiling)
+                            || (ff_af > ff_fr_threshold && fr_af > ff_fr_threshold);
                         match (ref_allele, alt_allele) {
                             (b"G", b"T") | (b"C", b"A") if !oxo.occurence_sufficient() => {
                                 insufficient_count = true
