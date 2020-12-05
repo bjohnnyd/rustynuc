@@ -33,4 +33,7 @@ pub enum Error {
     #[error("Could not read VCF/BCF file")]
     /// Read VCF/BCF Error
     CouldNotReadVcf(#[from] rust_htslib::bcf::Error),
+    #[error("Missing Tag `{0}` in infot field of VCF Record")]
+    /// Query INFO field tag Error
+    NoInfoTag(String),
 }

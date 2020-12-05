@@ -1,6 +1,6 @@
 #![warn(missing_debug_implementations, rust_2018_idioms, missing_docs)]
 
-//! QC tool for assesment of likelihood of 8-oxoG related variation.  
+//! QC tool for assesment of likelihood of 8-oxoG related variation.
 mod alignment;
 mod cli;
 mod error;
@@ -15,11 +15,14 @@ use rust_htslib::{bam, bam::Read};
 use rust_htslib::{bcf, bcf::Read as VcfRead};
 use std::collections::{HashMap, HashSet};
 use structopt::StructOpt;
-use vcf::{update_vcf_record, HEADER_RECORDS, INSUFFICIENT_FILTER, OXO_FILTER};
+use vcf::{
+    apply_af_too_low_filter, apply_fishers_filter, update_vcf_record, AF_MIN, HEADER_RECORDS,
+    INSUFFICIENT_FILTER,
+};
 
 /// Nucleotide alphabet used
 pub const NUCLEOTIDES: [u8; 4] = [b'A', b'C', b'G', b'T'];
-/// Defualt visualization settings for track line
+/// Default visualization settings for track line
 pub const TRACK_LINE: &str = "#coords 0";
 
 type Result<T> = std::result::Result<T, crate::error::Error>;
@@ -172,8 +175,6 @@ fn main_try() -> Result<()> {
         );
 
         let mut wrt = bcf::Writer::from_stdout(&header, true, bcf::Format::VCF)?;
-        let oxo_id = wrt.header().name_to_id(OXO_FILTER)?;
-        let insufficient_filter = wrt.header().name_to_id(INSUFFICIENT_FILTER)?;
 
         wrt.set_threads(opt.threads)?;
 
@@ -193,14 +194,31 @@ fn main_try() -> Result<()> {
                         && oxo.nuc_sufficient(ref_allele).iter().all(|x| *x) =>
                 {
                     debug!("Updating VCF information for {}", record.desc());
-                    update_vcf_record(
-                        &mut record,
-                        &oxo,
-                        (oxo_id, insufficient_filter),
-                        opt.fishers_sig,
-                        opt.fishers_af,
-                        opt.oxo_af_ceiling,
-                    )?
+                    if let Some(g2t_or_c2a_max_af) = update_vcf_record(&mut record, &oxo)? {
+                        if g2t_or_c2a_max_af > opt.af_either_pass {
+                            debug!("Record {} has a max orientation AF of {} which is above the frequency of {} and will not be considered for OxoG filtering", record.desc(), g2t_or_c2a_max_af, opt.af_either_pass)
+                        } else {
+                            if !oxo.occurence_sufficient() {
+                                debug!("Record {} has insufficient count", record.desc());
+                                let insufficient_filter =
+                                    wrt.header().name_to_id(INSUFFICIENT_FILTER)?;
+                                record.push_filter(insufficient_filter);
+                            } else {
+                                if !opt.skip_fishers {
+                                    debug!(
+                                        "Checking if record {} passes Fisher's OxoG filter...",
+                                        record.desc()
+                                    );
+                                    apply_fishers_filter(
+                                        &mut record,
+                                        opt.fishers_sig as f32,
+                                        opt.af_both_pass,
+                                    )?;
+                                }
+                                apply_af_too_low_filter(&mut record, AF_MIN)?;
+                            }
+                        }
+                    }
                 }
                 _ => {}
             }

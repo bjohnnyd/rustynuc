@@ -29,7 +29,7 @@ pub(crate) struct RustyNuc {
         help = "AF above this cutoff in EITHER read orientation will be excluded from OxoAF filter",
         default_value = "0.25"
     )]
-    pub(crate) oxo_af_ceiling: f32,
+    pub(crate) af_either_pass: f32,
     #[structopt(long, help = "Maximum pileup depth to use", default_value = "1000")]
     pub(crate) max_depth: u32,
     #[structopt(
@@ -42,10 +42,10 @@ pub(crate) struct RustyNuc {
     pub(crate) alpha: f32,
     #[structopt(
         long,
-        help = "AF on both the ff and fr at which point to not apply Fisher's exact pval filter in VCF",
+        help = "AF on both the ff and fr at which point a call in the VCF will excluded from the OxoAF filter",
         default_value = "0.1"
     )]
-    pub(crate) fishers_af: f32,
+    pub(crate) af_both_pass: f32,
     #[structopt(
         short,
         long,
@@ -58,6 +58,8 @@ pub(crate) struct RustyNuc {
         help = "Whether to process and print information for every position in the BAM file"
     )]
     pub(crate) all: bool,
+    #[structopt(long, help = "Skip applying Fisher's Exact Filter on VCF")]
+    pub(crate) skip_fishers: bool,
     #[structopt(
         help = "Alignments to investigate for possible 8-oxoG damage",
         required = true,
