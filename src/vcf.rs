@@ -121,31 +121,45 @@ pub fn update_vcf_record(record: &mut bcf::Record, oxo: &OxoPileup) -> Result<Op
 pub fn apply_fishers_filter(
     record: &mut bcf::Record,
     sig_threshold: f32,
-    ceiling: f32,
+    af_both_pass: f32,
 ) -> Result<()> {
     // TODO: should maybe make a function to iter through the resulting slice
     // and pass like a threshold to check against because this can be a zip
     let ac_pval = record.get_float_value("AC_PVAL")?[0].to_owned();
     let gt_pval = record.get_float_value("GT_PVAL")?[0].to_owned();
-    let below_ceiling = record
+    let above_both_pass = record
         .get_float_value("FF_FR_AF")?
         .chunks(2)
-        .any(|freqs| freqs.into_iter().all(|freq| freq < &ceiling));
+        .any(|freqs| freqs.into_iter().all(|freq| freq > &af_both_pass));
 
-    if (ac_pval < sig_threshold || gt_pval < sig_threshold) & below_ceiling {
-        debug!(
-            "Record {} is labeled as OxoG and is below the AF ceiling to apply oxo filter of {}",
-            record.desc(),
-            ceiling
-        );
+    if (ac_pval < sig_threshold || gt_pval < sig_threshold) & !above_both_pass {
+        debug!("Record {} is labeled as OxoG", record.desc());
         let hview = record.header();
         let id = hview.name_to_id(FISHERS_OXO_FILTER)?;
         record.push_filter(id);
+    } else {
+        if above_both_pass {
+            debug!(
+            "Record {} passes the Fisher's OxoG filter as it is above the AF threshold set at {}",
+            record.desc(),
+            af_both_pass
+        );
+        } else {
+            debug!(
+            "Record {} passes the Fisher's OxoG filter as the pValue is above the significance threshold set at {}",
+            record.desc(),
+            sig_threshold
+        );
+        }
     }
     Ok(())
 }
 
 pub fn apply_af_too_low_filter(record: &mut bcf::Record, min_af: f32) -> Result<()> {
+    debug!(
+        "Checking if record {} passes the AfTooLow Filter...",
+        record.desc()
+    );
     let ref_allele = record.alleles()[0].to_owned()[0];
     let ff_fr_freqs = record.get_float_value("FF_FR_AF")?.to_vec();
 
@@ -164,6 +178,8 @@ pub fn apply_af_too_low_filter(record: &mut bcf::Record, min_af: f32) -> Result<
         let hview = record.header();
         let id = hview.name_to_id(AF_LOW_FILTER)?;
         record.push_filter(id);
+    } else {
+        debug!("Record {} passes the AfTooLow filter", record.desc());
     }
 
     Ok(())

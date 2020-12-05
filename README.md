@@ -68,21 +68,21 @@ FLAGS:
     -w, --with-track-line    Include track line (for correct visualization with IGV)
 
 OPTIONS:
-        --alpha <alpha>                FDR threshold [default: 0.2]
-    -b, --bcf <bcf>                    BCF/VCF for variants called on the supplied alignment file
-        --bed <bed>                    A BED file to restrict analysis to specific regions
-        --fishers-sig <fishers-sig>    Significance threshold for Fisher's test [default: 0.05]
-        --max-depth <max-depth>        Maximum pileup depth to use [default: 1000]
-    -m, --min-reads <min-reads>        Minimum number of aligned reads in ff or fr orientation for a position to be
-                                       considered [default: 4]
-        --oxo-ceiling <oxo-ceiling>    AF above this cutoff in EITHER read orientation will be excluded from OxoAF
-                                       filter [default: 0.25]
-        --oxo-floor <oxo-floor>        AF on both the ff and fr at which point to not apply Fisher's exact pval filter
-                                       in VCF [default: 0.1]
-    -q, --quality <quality>            Minimum base quality to consider [default: 20]
-    -r, --reference <reference>        Optional reference which will be used to determine sequence context and type of
-                                       change
-    -t, --threads <threads>            Number of threads [default: 4]
+        --af-both-pass <af-both-pass>        AF on both the ff and fr at which point a call in the VCF will excluded
+                                             from the OxoAF filter [default: 0.1]
+        --af-either-pass <af-either-pass>    AF above this cutoff in EITHER read orientation will be excluded from OxoAF
+                                             filter [default: 0.25]
+        --alpha <alpha>                      FDR threshold [default: 0.2]
+    -b, --bcf <bcf>                          BCF/VCF for variants called on the supplied alignment file
+        --bed <bed>                          A BED file to restrict analysis to specific regions
+        --fishers-sig <fishers-sig>          Significance threshold for Fisher's test [default: 0.05]
+        --max-depth <max-depth>              Maximum pileup depth to use [default: 1000]
+    -m, --min-reads <min-reads>              Minimum number of aligned reads in ff or fr orientation for a position to
+                                             be considered [default: 4]
+    -q, --quality <quality>                  Minimum base quality to consider [default: 20]
+    -r, --reference <reference>              Optional reference which will be used to determine sequence context and
+                                             type of change
+    -t, --threads <threads>                  Number of threads [default: 4]
 
 ARGS:
     <bam>    Alignments to investigate for possible 8-oxoG damage

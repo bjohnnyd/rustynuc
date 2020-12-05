@@ -194,9 +194,9 @@ fn main_try() -> Result<()> {
                         && oxo.nuc_sufficient(ref_allele).iter().all(|x| *x) =>
                 {
                     debug!("Updating VCF information for {}", record.desc());
-                    if let Some(g2t_or_c2a_max_af) = dbg!(update_vcf_record(&mut record, &oxo)?) {
-                        if g2t_or_c2a_max_af > opt.oxo_ceiling {
-                            debug!("Record {} has at max orientation AF of {} which is above the OxoG ceiling frequency of {} and will not be considered for OxoG filtering", record.desc(), g2t_or_c2a_max_af, opt.oxo_ceiling)
+                    if let Some(g2t_or_c2a_max_af) = update_vcf_record(&mut record, &oxo)? {
+                        if g2t_or_c2a_max_af > opt.af_either_pass {
+                            debug!("Record {} has a max orientation AF of {} which is above the frequency of {} and will not be considered for OxoG filtering", record.desc(), g2t_or_c2a_max_af, opt.af_either_pass)
                         } else {
                             if !oxo.occurence_sufficient() {
                                 debug!("Record {} has insufficient count", record.desc());
@@ -205,10 +205,14 @@ fn main_try() -> Result<()> {
                                 record.push_filter(insufficient_filter);
                             } else {
                                 if !opt.skip_fishers {
+                                    debug!(
+                                        "Checking if record {} passes Fisher's OxoG filter...",
+                                        record.desc()
+                                    );
                                     apply_fishers_filter(
                                         &mut record,
                                         opt.fishers_sig as f32,
-                                        opt.oxo_floor,
+                                        opt.af_both_pass,
                                     )?;
                                 }
                                 apply_af_too_low_filter(&mut record, AF_MIN)?;

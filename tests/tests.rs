@@ -70,6 +70,25 @@ fn cli_oxog_bcf() {
 }
 
 #[test]
+fn cli_oxog_bcf_skip_fishers() {
+    let expected = vec!["PASS", "AfTooLow", "AfTooLow"];
+    let output = Command::cargo_bin("rustynuc")
+        .unwrap()
+        .args(&[
+            "--skip-fishers",
+            "-r",
+            "tests/input/ref.fa.gz",
+            "-b",
+            "tests/input/oxog.vcf.gz",
+            "tests/input/oxog.bam",
+        ])
+        .unwrap()
+        .stdout;
+    let filter_result = extract_filters(&output);
+    assert_eq!(filter_result, expected);
+}
+
+#[test]
 fn cli_print_all() {
     Command::cargo_bin("rustynuc")
         .unwrap()
@@ -107,7 +126,7 @@ fn cli_af_not_above_one() {
 }
 
 #[test]
-fn cli_not_oxog_as_above_ff_fr_threshold() {
+fn cli_not_oxog_as_above_either_pass() {
     let expected = vec!["PASS".to_string()];
     let output = Command::cargo_bin("rustynuc")
         .unwrap()
@@ -126,12 +145,12 @@ fn cli_not_oxog_as_above_ff_fr_threshold() {
 }
 
 #[test]
-fn cli_oxog_false_positive_below_ff_fr_threshold_but_above_ceiling() {
+fn cli_not_false_positive_as_they_pass_either_above_af() {
     let expected = vec!["PASS".to_string()];
     let output = Command::cargo_bin("rustynuc")
         .unwrap()
         .args(&[
-            "--oxo-ceiling",
+            "--af-both-pass",
             "0.6",
             "-r",
             "tests/input/high_af/high_af.oxog.ref.fa.gz",
@@ -148,15 +167,36 @@ fn cli_oxog_false_positive_below_ff_fr_threshold_but_above_ceiling() {
 }
 
 #[test]
-fn cli_oxog_false_positive_below_ff_fr_threshold_and_below_ceiling() {
-    let expected = vec!["FishersOxoG;AfTooLow".to_string()];
+fn cli_not_false_positive_oxog_one_freq_above_af_either_pass() {
+    let expected = vec!["PASS".to_string()];
     let output = Command::cargo_bin("rustynuc")
         .unwrap()
         .args(&[
-            "--oxo-floor",
+            "--af-either-pass",
             "0.6",
-            "--oxo-ceiling",
-            "1",
+            "-r",
+            "tests/input/high_af/high_af.oxog.ref.fa.gz",
+            "-b",
+            "tests/input/high_af/high_af.oxog.vcf.gz",
+            "tests/input/high_af/high_af.oxog.bam",
+        ])
+        .unwrap()
+        .stdout;
+
+    let filter_result = extract_filters(&output);
+    assert_eq!(filter_result, expected);
+}
+
+#[test]
+fn cli_false_positive_oxog_as_not_above_either_or_both() {
+    let expected = vec!["FishersOxoG".to_string()];
+    let output = Command::cargo_bin("rustynuc")
+        .unwrap()
+        .args(&[
+            "--af-both-pass",
+            "0.6",
+            "--af-either-pass",
+            "0.8",
             "-r",
             "tests/input/high_af/high_af.oxog.ref.fa.gz",
             "-b",
