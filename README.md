@@ -62,6 +62,7 @@ FLAGS:
         --no-overlapping     Do not count overlapping mates when calculating total depth
     -n, --no-qval            Skip calculating qvalue
     -p, --pseudocount        Whether to use pseudocounts (increments all counts by 1) when calculating statistics
+        --skip-fishers       Skip applying Fisher's Exact Filter on VCF
     -V, --version            Prints version information
     -v, --verbosity          Determines verbosity of the processing, can be specified multiple times -vvv
     -w, --with-track-line    Include track line (for correct visualization with IGV)

@@ -58,6 +58,8 @@ pub(crate) struct RustyNuc {
         help = "Whether to process and print information for every position in the BAM file"
     )]
     pub(crate) all: bool,
+    #[structopt(long, help = "Skip applying Fisher's Exact Filter on VCF")]
+    pub(crate) skip_fishers: bool,
     #[structopt(
         help = "Alignments to investigate for possible 8-oxoG damage",
         required = true,

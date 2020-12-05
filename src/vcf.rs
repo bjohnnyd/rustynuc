@@ -1,14 +1,21 @@
-use crate::alignment::{Orientation, OxoPileup};
 use crate::Result;
 use crate::NUCLEOTIDES;
+use crate::{
+    alignment::{Orientation, OxoPileup},
+    error::Error,
+};
+use bcf::Record;
 use log::debug;
-use rust_htslib::{bcf, bcf::header::Id};
+use rust_htslib::bcf;
 use std::collections::HashMap;
 
+// TODO: need to see if ff_fr_threshold filter is necessary (as in one of them being above a certain
+// frequency to be skipped) or ceiling is enough
 /// Header information added to VCF
-pub const HEADER_RECORDS: [&[u8]; 11] = [
-    br#"##FILTER=<ID=OxoG,Description="OxoG two-sided p-value < 0.05">"#,
-    br#"##FILTER=<ID=InsufficientCount,Description="Insufficient number of reads aligning in the FF or FR orientation">"#,
+pub const HEADER_RECORDS: [&[u8]; 12] = [
+    br#"##FILTER=<ID=FishersOxoG,Description="OxoG Fisher's exact p-value < 0.05">"#,
+    br#"##FILTER=<ID=InsufficientCount,Description="Insufficient number of reads aligning in the FF or FR orientation for calculations">"#,
+    br#"##FILTER=<ID=AfTooLow,Description="AF is below 0.04 on either FF or FR orientation">"#,
     br#"##INFO=<ID=OXO_DEPTH,Number=1,Type=Integer,Description="OxoG Pileup Depth">"#,
     br#"##INFO=<ID=ADENINE_FF_FR,Number=2,Type=Integer,Description="Adenine counts in FF and FR orientations">"#,
     br#"##INFO=<ID=CYTOSINE_FF_FR,Number=2,Type=Integer,Description="Cytosine counts in FF and FR orientations">"#,
@@ -20,19 +27,15 @@ pub const HEADER_RECORDS: [&[u8]; 11] = [
     br#"##INFO=<ID=OXO_CONTEXT,Number=1,Type=String,Description="3mer reference sequence context">"#,
 ];
 
-/// Name for significant filter
-pub const OXO_FILTER: &[u8] = b"OxoG";
+/// Name for Fisher's exact filter
+pub const FISHERS_OXO_FILTER: &[u8] = b"FishersOxoG";
 /// Name for insufficient counts filter
 pub const INSUFFICIENT_FILTER: &[u8] = b"InsufficientCount";
+/// Name for AF too low on FF/FR filter
+pub const AF_LOW_FILTER: &[u8] = b"AfTooLow";
+pub const AF_MIN: f32 = 0.04;
 
-pub fn update_vcf_record(
-    record: &mut bcf::Record,
-    oxo: &OxoPileup,
-    filter_id: (Id, Id),
-    sig_threshold: f64,
-    ff_fr_threshold: f32,
-    oxo_ceiling: f32,
-) -> Result<()> {
+pub fn update_vcf_record(record: &mut bcf::Record, oxo: &OxoPileup) -> Result<bool> {
     let counts = oxo
         .nuc_counts(Orientation::FF)
         .iter()
@@ -67,7 +70,7 @@ pub fn update_vcf_record(
 
     let ac_pval = oxo.get_nuc_pval(b'C')?;
     let gt_pval = oxo.get_nuc_pval(b'G')?;
-    let is_oxog = ac_pval < sig_threshold || gt_pval < sig_threshold;
+
     record.push_info_float(b"AC_PVAL", &[ac_pval as f32])?;
     record.push_info_float(b"GT_PVAL", &[gt_pval as f32])?;
 
@@ -75,8 +78,7 @@ pub fn update_vcf_record(
         record.push_info_string(b"OXO_CONTEXT", &[seq])?;
     }
 
-    let mut insufficient_count = false;
-    let mut above_ff_fr_threshold = false;
+    let mut is_g2t_or_c2a = false;
 
     match record.alleles()[0] {
         ref_allele if ref_allele == b"G" || ref_allele == b"C" => {
@@ -92,35 +94,103 @@ pub fn update_vcf_record(
                             alt_counts[0] as f32 / (ref_counts[0] as f32 + alt_counts[0] as f32);
                         let fr_af =
                             alt_counts[1] as f32 / (ref_counts[1] as f32 + alt_counts[1] as f32);
-                        above_ff_fr_threshold = (ff_af > oxo_ceiling || fr_af > oxo_ceiling)
-                            || (ff_af > ff_fr_threshold && fr_af > ff_fr_threshold);
-                        match (ref_allele, alt_allele) {
-                            (b"G", b"T") | (b"C", b"A") if !oxo.occurence_sufficient() => {
-                                insufficient_count = true
+                        if !is_g2t_or_c2a {
+                            match (ref_allele, alt_allele) {
+                                (b"G", b"T") | (b"C", b"A") => is_g2t_or_c2a = true,
+                                _ => {}
                             }
-                            _ => {}
                         }
                         oxo_af.push(ff_af);
                         oxo_af.push(fr_af);
                         oxo_af
                     });
 
-            if is_oxog && !above_ff_fr_threshold {
-                debug!(
-                    "Record {} is labeled as OxoG and is below the ff_fr_threshold of {}",
-                    record.desc(),
-                    ff_fr_threshold
-                );
-                record.push_filter(filter_id.0)
-            }
-
-            if insufficient_count {
-                debug!("Record {} has insufficient count", record.desc());
-                record.push_filter(filter_id.1)
-            };
             record.push_info_float(b"FF_FR_AF", oxo_af.as_slice())?;
         }
         _ => {}
     }
+    Ok(is_g2t_or_c2a)
+}
+
+// NOTE: Use this in main only need to call if it is an oxoG nucleotide can have the above function
+// return false or true on whether it is oxo G
+// Get oxo pval, whether oxo counts are sufficient
+pub fn apply_fishers_filter(
+    record: &mut bcf::Record,
+    sig_threshold: f32,
+    ceiling: f32,
+) -> Result<()> {
+    // TODO: should maybe make a function to iter through the resulting slice
+    // and pass like a threshold to check against because this can be a zip
+    let ac_pval = record.get_float_value("AC_PVAL")?[0].to_owned();
+    let gt_pval = record.get_float_value("GT_PVAL")?[0].to_owned();
+    let below_ceiling = record
+        .get_float_value("FF_FR_AF")?
+        .chunks(2)
+        .any(|freqs| freqs.into_iter().all(|freq| freq < &ceiling));
+
+    if (ac_pval < sig_threshold || gt_pval < sig_threshold) & below_ceiling {
+        debug!(
+            "Record {} is labeled as OxoG and is below the AF ceiling to apply oxo filter of {}",
+            record.desc(),
+            ceiling
+        );
+        let hview = record.header();
+        let id = hview.name_to_id(FISHERS_OXO_FILTER)?;
+        record.push_filter(id);
+    }
     Ok(())
+}
+
+pub fn apply_af_too_low_filter(record: &mut bcf::Record, min_af: f32) -> Result<()> {
+    let ref_allele = record.alleles()[0].to_owned()[0];
+    let ff_fr_freqs = record.get_float_value("FF_FR_AF")?.to_vec();
+
+    let af_too_low = record
+        .alleles()
+        .iter()
+        .skip(1)
+        .zip(ff_fr_freqs.chunks(2))
+        // TODO: NEED TO DEAL WITH DINUCLEOTIDE CHANGES (not alt_allele[0])
+        .any(|(alt_allele, freqs)| match (ref_allele, alt_allele[0]) {
+            (b'G', b'T') | (b'C', b'A') => freqs.into_iter().all(|freq| freq > &min_af),
+            _ => false,
+        });
+    if af_too_low {
+        let hview = record.header();
+        let id = hview.name_to_id(AF_LOW_FILTER)?;
+        record.push_filter(id);
+    }
+
+    Ok(())
+}
+
+trait InfoExt {
+    fn get_float_value<'a>(&'a mut self, tag: &'a str) -> Result<&'a [f32]>;
+}
+
+impl InfoExt for Record {
+    fn get_float_value<'a>(&'a mut self, tag: &'a str) -> Result<&'a [f32]> {
+        self.info(tag.as_bytes())
+            .float()?
+            .ok_or_else(|| Error::NoInfoTag(tag.to_string()))
+    }
+}
+#[cfg(test)]
+#[allow(unused)]
+mod tests {
+    use super::InfoExt;
+    use rust_htslib::{bcf, bcf::Read};
+
+    pub fn get_record_at(path: &str, idx: usize) -> bcf::Record {
+        let mut vcf = bcf::Reader::from_path(path).unwrap();
+        vcf.records().skip(idx).next().unwrap().unwrap()
+    }
+    fn test_get_frequencies_for_g2t_or_c2a() {
+        let mut record = get_record_at(
+            "/home/johnny/projects/rust_dev/rustynuc/tests/input/high_af/high_af.oxog.vcf.gz",
+            0,
+        );
+        let freqs = record.get_float_value("FF_FR_AF").unwrap();
+    }
 }
