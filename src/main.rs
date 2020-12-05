@@ -1,6 +1,6 @@
 #![warn(missing_debug_implementations, rust_2018_idioms, missing_docs)]
 
-//! QC tool for assesment of likelihood of 8-oxoG related variation.  
+//! QC tool for assesment of likelihood of 8-oxoG related variation.
 mod alignment;
 mod cli;
 mod error;
@@ -194,22 +194,25 @@ fn main_try() -> Result<()> {
                         && oxo.nuc_sufficient(ref_allele).iter().all(|x| *x) =>
                 {
                     debug!("Updating VCF information for {}", record.desc());
-                    let is_g2t_or_c2a = update_vcf_record(&mut record, &oxo)?;
-                    if is_g2t_or_c2a {
-                        if !oxo.occurence_sufficient() {
-                            debug!("Record {} has insufficient count", record.desc());
-                            let insufficient_filter =
-                                wrt.header().name_to_id(INSUFFICIENT_FILTER)?;
-                            record.push_filter(insufficient_filter);
+                    if let Some(g2t_or_c2a_max_af) = dbg!(update_vcf_record(&mut record, &oxo)?) {
+                        if g2t_or_c2a_max_af > opt.oxo_ceiling {
+                            debug!("Record {} has at max orientation AF of {} which is above the OxoG ceiling frequency of {} and will not be considered for OxoG filtering", record.desc(), g2t_or_c2a_max_af, opt.oxo_ceiling)
                         } else {
-                            if !opt.skip_fishers {
-                                apply_fishers_filter(
-                                    &mut record,
-                                    opt.fishers_sig as f32,
-                                    opt.oxo_af_ceiling,
-                                )?;
+                            if !oxo.occurence_sufficient() {
+                                debug!("Record {} has insufficient count", record.desc());
+                                let insufficient_filter =
+                                    wrt.header().name_to_id(INSUFFICIENT_FILTER)?;
+                                record.push_filter(insufficient_filter);
+                            } else {
+                                if !opt.skip_fishers {
+                                    apply_fishers_filter(
+                                        &mut record,
+                                        opt.fishers_sig as f32,
+                                        opt.oxo_floor,
+                                    )?;
+                                }
+                                apply_af_too_low_filter(&mut record, AF_MIN)?;
                             }
-                            apply_af_too_low_filter(&mut record, AF_MIN)?;
                         }
                     }
                 }

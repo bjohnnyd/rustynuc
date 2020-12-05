@@ -8,12 +8,13 @@ lazy_static! {
     static ref FF_FR_AF_REGEX: Regex = Regex::new("FF_FR_AF=(.+?),(.+?)\t").unwrap();
 }
 
-fn extract_filter(output: &[u8]) -> String {
+fn extract_filters(output: &[u8]) -> Vec<String> {
     String::from_utf8(output.to_vec())
         .unwrap()
         .lines()
         .filter(|l| !l.starts_with("#"))
         .flat_map(|l| l.split("\t").skip(6).next())
+        .map(String::from)
         .collect()
 }
 
@@ -51,18 +52,21 @@ fn cli_oxog_bam() {
 
 #[test]
 fn cli_oxog_bcf() {
-    Command::cargo_bin("rustynuc")
+    let expected = vec!["PASS", "FishersOxoG;AfTooLow", "FishersOxoG;AfTooLow"];
+    let output = Command::cargo_bin("rustynuc")
         .unwrap()
         .args(&[
+            "-vvv",
             "-r",
             "tests/input/ref.fa.gz",
             "-b",
             "tests/input/oxog.vcf.gz",
             "tests/input/oxog.bam",
         ])
-        .assert()
-        .stdout(contains("OxoG").count(5))
-        .stdout(contains("PASS"));
+        .unwrap()
+        .stdout;
+    let filter_result = extract_filters(&output);
+    assert_eq!(filter_result, expected);
 }
 
 #[test]
@@ -104,6 +108,7 @@ fn cli_af_not_above_one() {
 
 #[test]
 fn cli_not_oxog_as_above_ff_fr_threshold() {
+    let expected = vec!["PASS".to_string()];
     let output = Command::cargo_bin("rustynuc")
         .unwrap()
         .args(&[
@@ -116,16 +121,17 @@ fn cli_not_oxog_as_above_ff_fr_threshold() {
         .unwrap()
         .stdout;
 
-    let filter_result = extract_filter(&output);
-    assert_eq!(filter_result, "PASS".to_string())
+    let filter_result = extract_filters(&output);
+    assert_eq!(filter_result, expected)
 }
 
 #[test]
 fn cli_oxog_false_positive_below_ff_fr_threshold_but_above_ceiling() {
+    let expected = vec!["PASS".to_string()];
     let output = Command::cargo_bin("rustynuc")
         .unwrap()
         .args(&[
-            "--fishers-af",
+            "--oxo-ceiling",
             "0.6",
             "-r",
             "tests/input/high_af/high_af.oxog.ref.fa.gz",
@@ -136,19 +142,20 @@ fn cli_oxog_false_positive_below_ff_fr_threshold_but_above_ceiling() {
         .unwrap()
         .stdout;
 
-    let filter_result = extract_filter(&output);
+    let filter_result = extract_filters(&output);
 
-    assert_eq!(filter_result, "PASS".to_string());
+    assert_eq!(filter_result, expected)
 }
 
 #[test]
 fn cli_oxog_false_positive_below_ff_fr_threshold_and_below_ceiling() {
+    let expected = vec!["FishersOxoG;AfTooLow".to_string()];
     let output = Command::cargo_bin("rustynuc")
         .unwrap()
         .args(&[
-            "--fishers-af",
+            "--oxo-floor",
             "0.6",
-            "--oxo-af-ceiling",
+            "--oxo-ceiling",
             "1",
             "-r",
             "tests/input/high_af/high_af.oxog.ref.fa.gz",
@@ -159,7 +166,6 @@ fn cli_oxog_false_positive_below_ff_fr_threshold_and_below_ceiling() {
         .unwrap()
         .stdout;
 
-    let filter_result = extract_filter(&output);
-
-    assert_eq!(filter_result, "OxoG".to_string());
+    let filter_result = extract_filters(&output);
+    assert_eq!(filter_result, expected);
 }

@@ -35,7 +35,7 @@ pub const INSUFFICIENT_FILTER: &[u8] = b"InsufficientCount";
 pub const AF_LOW_FILTER: &[u8] = b"AfTooLow";
 pub const AF_MIN: f32 = 0.04;
 
-pub fn update_vcf_record(record: &mut bcf::Record, oxo: &OxoPileup) -> Result<bool> {
+pub fn update_vcf_record(record: &mut bcf::Record, oxo: &OxoPileup) -> Result<Option<f32>> {
     let counts = oxo
         .nuc_counts(Orientation::FF)
         .iter()
@@ -78,7 +78,7 @@ pub fn update_vcf_record(record: &mut bcf::Record, oxo: &OxoPileup) -> Result<bo
         record.push_info_string(b"OXO_CONTEXT", &[seq])?;
     }
 
-    let mut is_g2t_or_c2a = false;
+    let mut is_g2t_or_c2a: Option<f32> = None;
 
     match record.alleles()[0] {
         ref_allele if ref_allele == b"G" || ref_allele == b"C" => {
@@ -94,14 +94,20 @@ pub fn update_vcf_record(record: &mut bcf::Record, oxo: &OxoPileup) -> Result<bo
                             alt_counts[0] as f32 / (ref_counts[0] as f32 + alt_counts[0] as f32);
                         let fr_af =
                             alt_counts[1] as f32 / (ref_counts[1] as f32 + alt_counts[1] as f32);
-                        if !is_g2t_or_c2a {
-                            match (ref_allele, alt_allele) {
-                                (b"G", b"T") | (b"C", b"A") => is_g2t_or_c2a = true,
-                                _ => {}
-                            }
-                        }
                         oxo_af.push(ff_af);
                         oxo_af.push(fr_af);
+
+                        match (ref_allele, alt_allele) {
+                            (b"G", b"T") | (b"C", b"A") => {
+                                let max_orientation_af = ff_af.max(fr_af);
+                                is_g2t_or_c2a =
+                                    Some(is_g2t_or_c2a.map_or(max_orientation_af, |af| {
+                                        af.max(max_orientation_af)
+                                    }));
+                            }
+                            _ => {}
+                        }
+
                         oxo_af
                     });
 
@@ -112,9 +118,6 @@ pub fn update_vcf_record(record: &mut bcf::Record, oxo: &OxoPileup) -> Result<bo
     Ok(is_g2t_or_c2a)
 }
 
-// NOTE: Use this in main only need to call if it is an oxoG nucleotide can have the above function
-// return false or true on whether it is oxo G
-// Get oxo pval, whether oxo counts are sufficient
 pub fn apply_fishers_filter(
     record: &mut bcf::Record,
     sig_threshold: f32,
@@ -153,10 +156,11 @@ pub fn apply_af_too_low_filter(record: &mut bcf::Record, min_af: f32) -> Result<
         .zip(ff_fr_freqs.chunks(2))
         // TODO: NEED TO DEAL WITH DINUCLEOTIDE CHANGES (not alt_allele[0])
         .any(|(alt_allele, freqs)| match (ref_allele, alt_allele[0]) {
-            (b'G', b'T') | (b'C', b'A') => freqs.into_iter().all(|freq| freq > &min_af),
+            (b'G', b'T') | (b'C', b'A') => freqs.into_iter().any(|freq| freq < &min_af),
             _ => false,
         });
     if af_too_low {
+        debug!("Record {} has an AF below the min of {} in at least one read orientation and will be labeled as AfTooLow", record.desc(), min_af);
         let hview = record.header();
         let id = hview.name_to_id(AF_LOW_FILTER)?;
         record.push_filter(id);
