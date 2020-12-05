@@ -14,6 +14,8 @@ use rayon::prelude::*;
 use rust_htslib::{bam, bam::Read};
 use rust_htslib::{bcf, bcf::Read as VcfRead};
 use std::collections::{HashMap, HashSet};
+use std::io::Write;
+use std::{io, sync::mpsc::channel};
 use structopt::StructOpt;
 use vcf::{
     apply_af_too_low_filter, apply_fishers_filter, update_vcf_record, AF_MIN, HEADER_RECORDS,
@@ -42,6 +44,9 @@ fn main_try() -> Result<()> {
     opt.set_logging();
     let alpha = opt.alpha;
     let calc_qval = !opt.no_qval;
+    let stdout = io::stdout();
+    let lock = stdout.lock();
+    let mut wstdout = io::BufWriter::new(lock);
 
     rayon::ThreadPoolBuilder::new()
         .num_threads(opt.threads)
@@ -242,14 +247,15 @@ fn main_try() -> Result<()> {
         };
 
         if opt.with_track_line {
-            println!("{}", TRACK_LINE);
+            writeln!(wstdout, "{}", TRACK_LINE)?;
         }
 
         info!("Started adj.p-value calculation and output processing...");
+        let (tx, rx) = channel();
         let _ = oxo_pileups
             .par_iter()
             .enumerate()
-            .map(|(rank, p)| {
+            .map_with(tx, |s, (rank, p)| {
                 let pval = p.pval()?;
                 let mut corrected = String::from("");
                 if calc_qval {
@@ -257,10 +263,13 @@ fn main_try() -> Result<()> {
                     let sig = if pval < qval as f64 { 1 } else { 0 };
                     corrected = format!("{}\t{}", qval, sig);
                 }
-                println!("{}\t{}", p.to_bed_row()?, corrected);
+                s.send(format!("{}\t{}", p.to_bed_row()?, corrected))?;
                 Ok(())
             })
             .collect::<Result<Vec<()>>>();
+        for _ in 0..oxo_pileups.len() {
+            writeln!(wstdout, "{}", rx.recv()?)?;
+        }
     }
 
     info!("Done!");

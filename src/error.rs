@@ -1,3 +1,5 @@
+use std::sync::mpsc::{RecvError, SendError};
+
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -36,4 +38,10 @@ pub enum Error {
     #[error("Missing Tag `{0}` in infot field of VCF Record")]
     /// Query INFO field tag Error
     NoInfoTag(String),
+    #[error("Could not receive across threads")]
+    /// Failed to receive BED rows across threads
+    ParallelWriterRecv(#[from] RecvError),
+    #[error("Could not receive across threads")]
+    /// Failed to send BED rows across threads
+    ParallelWriterSend(#[from] SendError<String>),
 }
