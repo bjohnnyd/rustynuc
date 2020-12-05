@@ -281,7 +281,7 @@ fn get_seq_context(seq: &[u8], pos: u32) -> [u8; 3] {
 /// Checks if nucleotide at specifc positions is IUPAC S
 pub fn is_pos_iupac_s(seq: &[u8], pos: usize) -> bool {
     if pos >= seq.len() {
-        error!("Reference sequence is shorter than BAM alignment positions");
+        error!("Reference sequence is shorter than BAM alignment positions. Got pileup at position {} but reference is only {} long", pos + 1, seq.len());
         std::process::exit(1)
     } else {
         match seq[pos] {
