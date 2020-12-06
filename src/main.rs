@@ -1,4 +1,10 @@
-#![warn(missing_debug_implementations, rust_2018_idioms, missing_docs)]
+#![warn(
+    missing_debug_implementations,
+    rust_2018_idioms,
+    missing_docs,
+    dead_code,
+    unused
+)]
 
 //! QC tool for assesment of likelihood of 8-oxoG related variation.
 mod alignment;
@@ -7,8 +13,8 @@ mod error;
 mod genomic;
 mod vcf;
 
-use crate::alignment::{is_pos_iupac_s, OxoPileup};
-use genomic::{create_fasta_records, create_pileups, create_regions};
+use crate::alignment::OxoPileup;
+use genomic::{create_fasta_records, create_pileups, create_regions, is_any_iupac_s};
 use log::{debug, error, info, warn};
 use rayon::prelude::*;
 use rust_htslib::{bam, bam::Read};
@@ -97,7 +103,7 @@ fn main_try() -> Result<()> {
                 record.desc(),
                 String::from_utf8(reference.to_vec())?
             );
-            if reference.len() == 1 && is_pos_iupac_s(reference, 0) {
+            if is_any_iupac_s(reference, 0, reference.len()) {
                 debug!(
                     "Record {} in the VCF will be processed for potential 8-oxoG",
                     record.desc()
@@ -141,7 +147,7 @@ fn main_try() -> Result<()> {
         let seq = fasta_records.get(&chrom);
 
         if let Some(seq) = seq {
-            if !is_pos_iupac_s(seq.as_bytes(), pos) {
+            if !is_any_iupac_s(seq.as_bytes(), pos, pos + 1) {
                 debug!("Pileup {}:{} is not G/C and will be skipped", &chrom, pos);
                 continue 'pileups;
             }

@@ -1,6 +1,10 @@
+#![warn(missing_debug_implementations, missing_docs)]
+#![deny(dead_code, unused)]
+
 use crate::error::Error;
+use crate::genomic::is_any_iupac_s;
 use fishers_exact::fishers_exact;
-use log::{debug, error};
+use log::debug;
 use rust_htslib::bam::pileup::Pileup;
 use std::collections::HashMap;
 
@@ -178,7 +182,7 @@ impl OxoPileup {
     /// or if the reference is unknown the smaller of the A/C and G/T two-tailed p.values
     pub fn pval(&self) -> Result<f64> {
         match self.context {
-            Some(context) if is_pos_iupac_s(&context[..], 1) => self.get_nuc_pval(context[1]),
+            Some(context) if is_any_iupac_s(&context[..], 1, 2) => self.get_nuc_pval(context[1]),
             _ => {
                 let ac = self.get_nuc_pval(b'A')?;
                 let gt = self.get_nuc_pval(b'G')?;
@@ -276,17 +280,4 @@ fn get_seq_context(seq: &[u8], pos: u32) -> [u8; 3] {
     }
 
     context
-}
-
-/// Checks if nucleotide at specifc positions is IUPAC S
-pub fn is_pos_iupac_s(seq: &[u8], pos: usize) -> bool {
-    if pos >= seq.len() {
-        error!("Reference sequence is shorter than BAM alignment positions");
-        std::process::exit(1)
-    } else {
-        match seq[pos] {
-            b'G' | b'C' | b'g' | b'c' => true,
-            _ => false,
-        }
-    }
 }

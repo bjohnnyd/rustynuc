@@ -1,9 +1,9 @@
-use crate::Result;
 use crate::NUCLEOTIDES;
 use crate::{
     alignment::{Orientation, OxoPileup},
     error::Error,
 };
+use crate::{genomic::is_any_g2t_or_c2a, Result};
 use bcf::Record;
 use log::debug;
 use rust_htslib::bcf;
@@ -33,6 +33,7 @@ pub const FISHERS_OXO_FILTER: &[u8] = b"FishersOxoG";
 pub const INSUFFICIENT_FILTER: &[u8] = b"InsufficientCount";
 /// Name for AF too low on FF/FR filter
 pub const AF_LOW_FILTER: &[u8] = b"AfTooLow";
+
 pub const AF_MIN: f32 = 0.04;
 
 pub fn update_vcf_record(record: &mut bcf::Record, oxo: &OxoPileup) -> Result<Option<f32>> {
@@ -78,7 +79,7 @@ pub fn update_vcf_record(record: &mut bcf::Record, oxo: &OxoPileup) -> Result<Op
         record.push_info_string(b"OXO_CONTEXT", &[seq])?;
     }
 
-    let mut is_g2t_or_c2a: Option<f32> = None;
+    let mut g2t_or_c2a_max_freq: Option<f32> = None;
 
     match record.alleles()[0] {
         ref_allele if ref_allele == b"G" || ref_allele == b"C" => {
@@ -89,7 +90,7 @@ pub fn update_vcf_record(record: &mut bcf::Record, oxo: &OxoPileup) -> Result<Op
                     .skip(1)
                     .fold(Vec::new(), |mut oxo_af, alt_allele| {
                         let alt_counts = counts.get(&alt_allele[0]).unwrap_or_else(|| &[0, 0]);
-                        let ref_counts = counts.get(&ref_allele[0]).unwrap_or_else(|| &[1, 1]);
+                        let ref_counts = counts.get(&ref_allele[0]).unwrap_or_else(|| &[0, 0]);
                         let ff_af =
                             alt_counts[0] as f32 / (ref_counts[0] as f32 + alt_counts[0] as f32);
                         let fr_af =
@@ -100,8 +101,8 @@ pub fn update_vcf_record(record: &mut bcf::Record, oxo: &OxoPileup) -> Result<Op
                         match (ref_allele, alt_allele) {
                             (b"G", b"T") | (b"C", b"A") => {
                                 let max_orientation_af = ff_af.max(fr_af);
-                                is_g2t_or_c2a =
-                                    Some(is_g2t_or_c2a.map_or(max_orientation_af, |af| {
+                                g2t_or_c2a_max_freq =
+                                    Some(g2t_or_c2a_max_freq.map_or(max_orientation_af, |af| {
                                         af.max(max_orientation_af)
                                     }));
                             }
@@ -115,7 +116,7 @@ pub fn update_vcf_record(record: &mut bcf::Record, oxo: &OxoPileup) -> Result<Op
         }
         _ => {}
     }
-    Ok(is_g2t_or_c2a)
+    Ok(g2t_or_c2a_max_freq)
 }
 
 pub fn apply_fishers_filter(
@@ -160,7 +161,7 @@ pub fn apply_af_too_low_filter(record: &mut bcf::Record, min_af: f32) -> Result<
         "Checking if record {} passes the AfTooLow Filter...",
         record.desc()
     );
-    let ref_allele = record.alleles()[0].to_owned()[0];
+    let ref_allele = record.alleles()[0].to_owned();
     let ff_fr_freqs = record.get_float_value("FF_FR_AF")?.to_vec();
 
     let af_too_low = record
@@ -169,9 +170,12 @@ pub fn apply_af_too_low_filter(record: &mut bcf::Record, min_af: f32) -> Result<
         .skip(1)
         .zip(ff_fr_freqs.chunks(2))
         // TODO: NEED TO DEAL WITH DINUCLEOTIDE CHANGES (not alt_allele[0])
-        .any(|(alt_allele, freqs)| match (ref_allele, alt_allele[0]) {
-            (b'G', b'T') | (b'C', b'A') => freqs.into_iter().any(|freq| freq < &min_af),
-            _ => false,
+        .any(|(alt_allele, freqs)| {
+            if is_any_g2t_or_c2a(&ref_allele[..], alt_allele) {
+                freqs.into_iter().any(|freq| freq < &min_af)
+            } else {
+                false
+            }
         });
     if af_too_low {
         debug!("Record {} has an AF below the min of {} in at least one read orientation and will be labeled as AfTooLow", record.desc(), min_af);
