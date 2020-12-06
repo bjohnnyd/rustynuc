@@ -194,6 +194,13 @@ fn main_try() -> Result<()> {
             let mut record = record?;
             wrt.translate(&mut record);
             let ref_allele = record.alleles()[0].to_ascii_uppercase()[0];
+            if record
+                .alleles()
+                .iter()
+                .any(|alt_allele| alt_allele.len() > 1)
+            {
+                warn!("Identified MNP at record {}, this will not be processed correctly and it is recommended to normalize and convert all variant calls to allelic primitives", record.desc());
+            }
             debug!(
                 "Checking if record {} is among the total of {} records labelled as to be processed for OxoG...",
                 &record.desc(),

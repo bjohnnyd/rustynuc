@@ -1,6 +1,9 @@
 use assert_cmd::prelude::*;
 use lazy_static::lazy_static;
-use predicates::str::{contains, is_empty, is_match, PredicateStrExt};
+use predicates::{
+    boolean::NotPredicate,
+    str::{contains, is_empty, is_match, PredicateStrExt},
+};
 use regex::Regex;
 use std::process::Command;
 
@@ -51,12 +54,42 @@ fn cli_oxog_bam() {
 }
 
 #[test]
+fn cli_warn_about_mnp() {
+    Command::cargo_bin("rustynuc")
+        .unwrap()
+        .args(&[
+            "-r",
+            "tests/input/ref.fa.gz",
+            "-b",
+            "tests/input/oxog.vcf.gz",
+            "tests/input/oxog.bam",
+        ])
+        .assert()
+        .stderr(contains("Identified MNP at record"));
+}
+
+#[test]
+fn cli_dont_warn_as_no_mnp() {
+    let should_not_contain_mnp = NotPredicate::new(contains("Identified MNP at record"));
+    Command::cargo_bin("rustynuc")
+        .unwrap()
+        .args(&[
+            "-r",
+            "tests/input/ref.fa.gz",
+            "-b",
+            "tests/input/oxog.vcf.onlysnp.gz",
+            "tests/input/oxog.bam",
+        ])
+        .assert()
+        .stderr(should_not_contain_mnp);
+}
+
+#[test]
 fn cli_oxog_bcf() {
     let expected = vec!["PASS", "FishersOxoG;AfTooLow", "FishersOxoG;AfTooLow"];
     let output = Command::cargo_bin("rustynuc")
         .unwrap()
         .args(&[
-            "-vvv",
             "-r",
             "tests/input/ref.fa.gz",
             "-b",
