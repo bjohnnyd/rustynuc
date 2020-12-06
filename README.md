@@ -90,7 +90,7 @@ ARGS:
 
 ### Output
 
-The default output (if not `--bcf/-b` is provided) is a BED file with the following info:
+The default output (if no `--bcf/-b` is provided) is a BED file with the following info:
 
 ```
 1. Chromosome
@@ -121,8 +121,9 @@ If a VCF/BCF is provided the output will be in VCF format.  Multiple summaries a
 
 | TYPE | ID | Description  |
 | :-----------------------------: | :-----------------------------: | :-------------------------------------: |
-| FILTER | OxoG   | OxoG two-sided p-value < 0.05 |
-| FILTER | InsufficientCount   | Insufficient number of reads aligning in the FF or FR orientation |
+| FILTER | OxoG   | OxoG Fisher's exact p-value < 0.05 |
+| FILTER | InsufficientCount   | Insufficient number of reads aligning in the FF or FR orientation for calculations |
+| FILTER | AfTooLow   | AF is below 0.04 on either FF or FR orientation |
 | INFO | OXO_DEPTH   | OxoG Pileup Depth |
 | INFO | ADENINE_FF_FR   | Adenine counts in FF and FR orientations |
 | INFO | CYTOSINE_FF_FR   | Cytosine counts in FF and FR orientations |
@@ -153,10 +154,12 @@ The MIT License (MIT). Please see [License File](LICENSE.md) for more informatio
 
 ## Notes
 
+*Currently will only process non-MNP calls so it is recommended to normalize and convert to allelic primitives all variants prior to using the tool.*
+
+### Additional Notes
 - `DEPTH` is the key determinant of power in discerning 8-oxoG
 - in cases where depth is not high the `AF_FF_FR` alternate frequency filter is a better option
-- fisher's exact is affected heavily by 0 counts so `pseudocounts` can be used
-- fisher's exact test is fairly conservative so might underestimate the true numbers
+- fisher's exact is affected by 0 counts so `pseudocounts` can be used
 - FDR will be heavily dependent on %GC of the genome, size of the genome, whether a reference was provided, a VCF is provided or the test was restricted to specific regions.
 
 ##  Crates to Credit
