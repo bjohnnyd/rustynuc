@@ -34,7 +34,7 @@ pub const INSUFFICIENT_FILTER: &[u8] = b"InsufficientCount";
 /// Name for AF too low on FF/FR filter
 pub const AF_LOW_FILTER: &[u8] = b"AfTooLow";
 
-pub const AF_MIN: f32 = 0.04;
+pub const AF_MIN: f32 = 0.02;
 
 pub fn update_vcf_record(record: &mut bcf::Record, oxo: &OxoPileup) -> Result<Option<f32>> {
     let counts = oxo
