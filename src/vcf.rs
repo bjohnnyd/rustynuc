@@ -9,9 +9,7 @@ use log::debug;
 use rust_htslib::bcf;
 use std::collections::HashMap;
 
-// TODO: need to see if ff_fr_threshold filter is necessary (as in one of them being above a certain
-// frequency to be skipped) or ceiling is enough
-/// Header information added to VCF
+/// Header information updated in VCF
 pub const HEADER_RECORDS: [&[u8]; 12] = [
     br#"##FILTER=<ID=FishersOxoG,Description="OxoG Fisher's exact p-value < 0.05">"#,
     br#"##FILTER=<ID=InsufficientCount,Description="Insufficient number of reads aligning in the FF or FR orientation for calculations">"#,
@@ -34,10 +32,28 @@ pub const INSUFFICIENT_FILTER: &[u8] = b"InsufficientCount";
 /// Name for AF too low on FF/FR filter
 pub const AF_LOW_FILTER: &[u8] = b"AfTooLow";
 
-/// The minimu AF on both FF and FR orienation in order for a variant to not be labelled as
-/// AfTooLow
+/// Minimum AF on both FF and FR orientation in order for a variant to pass AfTooLow
 pub const AF_MIN: f32 = 0.02;
 
+/// Returns the maximum frequency across FR and FF and returns it. Updates the supplied VCF record
+/// with all calculated metadata from the provided oxo pileup.
+///
+/// # Arguments
+///
+/// * `record` - A VCF record to be updated with metadata
+/// * `oxo` - OxoPileup matching the VCF record position which will be used to update the VCF
+/// record
+///
+/// ```
+/// use bcf::record::Record;
+/// use crate::alignment::OxoPileup;
+/// use crate::vcf::HEADER_RECORDS;
+///
+/// // get pileup from testing bam
+/// // get record from testing vcf
+/// // pass to function and iter header content and assert all present
+///
+/// ```
 pub fn update_vcf_record(record: &mut bcf::Record, oxo: &OxoPileup) -> Result<Option<f32>> {
     let counts = oxo
         .nuc_counts(Orientation::FF)
