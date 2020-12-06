@@ -36,7 +36,7 @@ pub const AF_LOW_FILTER: &[u8] = b"AfTooLow";
 
 /// The minimu AF on both FF and FR orienation in order for a variant to not be labelled as
 /// AfTooLow
-pub const AF_MIN: f32 = 0.04;
+pub const AF_MIN: f32 = 0.02;
 
 pub fn update_vcf_record(record: &mut bcf::Record, oxo: &OxoPileup) -> Result<Option<f32>> {
     let counts = oxo
