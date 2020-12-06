@@ -1,5 +1,6 @@
 use crate::Result;
 use bio::utils::Interval;
+use log::error;
 use rust_htslib::{bam, bam::Read};
 use std::collections::HashMap;
 
@@ -50,4 +51,28 @@ pub fn create_regions<T: std::io::Read>(
         regions.push(interval);
     }
     Ok(())
+}
+
+/// Checks if nucleotide at specifc positions is IUPAC S
+pub fn is_any_iupac_s(seq: &[u8], start: usize, end: usize) -> bool {
+    if start >= seq.len() || end > seq.len() {
+        error!("Reference sequence is shorter than BAM alignment positions");
+        std::process::exit(1)
+    } else {
+        seq[start..end].iter().any(|nuc| match nuc {
+            b'G' | b'C' | b'g' | b'c' => true,
+            _ => false,
+        })
+    }
+}
+
+/// Checks if a ref and alt allele are G --> T or A --> C
+pub fn is_any_g2t_or_c2a(ref_allele: &[u8], alt_allele: &[u8]) -> bool {
+    ref_allele
+        .iter()
+        .zip(alt_allele.iter())
+        .any(|alleles| match alleles {
+            (b'G', b'T') | (b'C', b'A') => true,
+            _ => false,
+        })
 }
