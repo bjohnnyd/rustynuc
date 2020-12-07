@@ -5,14 +5,15 @@ on:
       - gh-pages
 name: Build and deploy GH Pages
 jobs:
-  build:
-    name: shalzz/zola-deploy-action
+  build_and_deploy:
     runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/gh-pages'
     steps:
-    - uses: actions/checkout@master
-    # Build & deploy
-    - name: shalzz/zola-deploy-action
-      uses: shalzz/zola-deploy-action@v0.12.0
-      env:
-        PAGES_BRANCH: gh-pages
-        TOKEN: ${{ secrets.TOKEN }}
+      - name: 'Checkout'
+        uses: actions/checkout@gh-pages
+      - name: 'Build and Deploy'
+        uses: shalzz/zola-deploy-action@v0.12.0
+        env:
+          PAGES_BRANCH: gh-pages
+          TOKEN: ${{ secrets.TOKEN }}
+          BUILD_DIR: .
