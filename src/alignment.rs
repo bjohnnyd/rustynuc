@@ -1,4 +1,4 @@
-#![warn(missing_debug_implementations, missing_docs)]
+#![deny(missing_debug_implementations, missing_docs)]
 #![deny(dead_code, unused)]
 
 use crate::error::Error;
@@ -12,7 +12,7 @@ type Result<T> = std::result::Result<T, Error>;
 
 /// Contains summary of a pileup split into `first in pair` and `second in pair`.
 /// Contains helper functions for determining likelihood of reads containing oxo damage.
-#[allow(missing_docs)]
+#[derive(Debug)]
 pub struct OxoPileup {
     pub chrom: String,
     pub depth: u32,

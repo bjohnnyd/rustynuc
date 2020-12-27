@@ -11,7 +11,9 @@ mod alignment;
 mod cli;
 mod error;
 mod genomic;
-mod vcf;
+
+/// Parsing VCF records and updating filters
+pub mod vcf;
 
 use crate::alignment::OxoPileup;
 use genomic::{create_fasta_records, create_pileups, create_regions, is_any_iupac_s};
