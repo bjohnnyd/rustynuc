@@ -1,0 +1,10 @@
+base_url = "https://bjohnnyd.github.io/rustynuc/"
+title = "Rustynuc"
+description = "Quick analysis of pileups for likely 8-oxoG locations"
+compile_sass = true
+highlight_code = true
+build_search_index = false
+
+theme = "hyde"
+[extra]
+hyde_theme = "theme-base-0d"

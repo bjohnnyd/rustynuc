@@ -1,0 +1,7 @@
+/.idea/
+/.README.template
+/target
+/doc
+/**.rs
+/~*
+/public
