@@ -1,2 +1,0 @@
-User-agent: *
-Sitemap: https://bjohnnyd.github.io/rustynuc/sitemap.xml
