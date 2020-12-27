@@ -10,7 +10,7 @@ jobs:
     if: github.ref == 'refs/heads/gh-pages'
     steps:
       - name: 'Checkout'
-        uses: actions/checkout@gh-pages
+        uses: actions/checkout@master
       - name: 'Build and Deploy'
         uses: shalzz/zola-deploy-action@v0.12.0
         env:
