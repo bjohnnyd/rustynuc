@@ -37,23 +37,6 @@ pub const AF_MIN: f32 = 0.02;
 
 /// Returns the maximum frequency across FR and FF and returns it. Updates the supplied VCF record
 /// with all calculated metadata from the provided oxo pileup.
-///
-/// # Arguments
-///
-/// * `record` - A VCF record to be updated with metadata
-/// * `oxo` - OxoPileup matching the VCF record position which will be used to update the VCF
-/// record
-///
-/// ```
-/// use bcf::record::Record;
-/// use crate::alignment::OxoPileup;
-/// use crate::vcf::HEADER_RECORDS;
-///
-/// // get pileup from testing bam
-/// // get record from testing vcf
-/// // pass to function and iter header content and assert all present
-///
-/// ```
 pub fn update_vcf_record(record: &mut bcf::Record, oxo: &OxoPileup) -> Result<Option<f32>> {
     let counts = oxo
         .nuc_counts(Orientation::FF)
@@ -137,43 +120,43 @@ pub fn update_vcf_record(record: &mut bcf::Record, oxo: &OxoPileup) -> Result<Op
     Ok(g2t_or_c2a_max_freq)
 }
 
+/// Applies the `FishersOxoG` filter to the VCF record based on the provided significance threshold and
+/// frequency above which both ff and fr will be labelled as PASS
 pub fn apply_fishers_filter(
     record: &mut bcf::Record,
     sig_threshold: f32,
     af_both_pass: f32,
 ) -> Result<()> {
-    // TODO: should maybe make a function to iter through the resulting slice
-    // and pass like a threshold to check against because this can be a zip
     let ac_pval = record.get_float_value("AC_PVAL")?[0].to_owned();
     let gt_pval = record.get_float_value("GT_PVAL")?[0].to_owned();
     let above_both_pass = record
         .get_float_value("FF_FR_AF")?
         .chunks(2)
-        .any(|freqs| freqs.into_iter().all(|freq| freq > &af_both_pass));
+        .any(|freqs| freqs.iter().all(|freq| freq > &af_both_pass));
 
     if (ac_pval < sig_threshold || gt_pval < sig_threshold) & !above_both_pass {
         debug!("Record {} is labeled as OxoG", record.desc());
         let hview = record.header();
         let id = hview.name_to_id(FISHERS_OXO_FILTER)?;
         record.push_filter(id);
-    } else {
-        if above_both_pass {
-            debug!(
+    } else if above_both_pass {
+        debug!(
             "Record {} passes the Fisher's OxoG filter as it is above the AF threshold set at {}",
             record.desc(),
             af_both_pass
         );
-        } else {
-            debug!(
+    } else {
+        debug!(
             "Record {} passes the Fisher's OxoG filter as the pValue is above the significance threshold set at {}",
             record.desc(),
             sig_threshold
         );
-        }
     }
     Ok(())
 }
 
+/// Applies the `AfTooLow` filter to VCF record by checking if any FF or FR frequencies across the
+/// ALT alleles is below the provided `min_af`
 pub fn apply_af_too_low_filter(record: &mut bcf::Record, min_af: f32) -> Result<()> {
     debug!(
         "Checking if record {} passes the AfTooLow Filter...",
