@@ -173,7 +173,7 @@ pub fn apply_af_too_low_filter(record: &mut bcf::Record, min_af: f32) -> Result<
         // TODO: NEED TO DEAL WITH DINUCLEOTIDE CHANGES (not alt_allele[0])
         .any(|(alt_allele, freqs)| {
             if is_any_g2t_or_c2a(&ref_allele[..], alt_allele) {
-                freqs.into_iter().any(|freq| freq < &min_af)
+                freqs.iter().any(|freq| freq < &min_af)
             } else {
                 false
             }

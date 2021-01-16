@@ -59,7 +59,7 @@ fn main_try() -> Result<()> {
     rayon::ThreadPoolBuilder::new()
         .num_threads(opt.threads)
         .build_global()
-        .or_else(|_| Err(crate::error::Error::ThreadError))?;
+        .map_err(|_| crate::error::Error::ThreadError)?;
 
     let mut bam = bam::Reader::from_path(opt.bam)?;
     let header = bam.header().clone();
@@ -165,7 +165,7 @@ fn main_try() -> Result<()> {
             opt.no_overlapping,
         );
 
-        if let Some(_) = opt.bcf {
+        if opt.bcf.is_some() {
             oxo_check_locations.insert(oxo.desc(), oxo);
         } else if opt.all {
             debug!("Pileup {}:{} will be analysed for 8-oxoG", &oxo.chrom, pos);
@@ -217,26 +217,24 @@ fn main_try() -> Result<()> {
                     if let Some(g2t_or_c2a_max_af) = update_vcf_record(&mut record, &oxo)? {
                         if g2t_or_c2a_max_af > opt.af_either_pass {
                             debug!("Record {} has a max orientation AF of {} which is above the frequency of {} and will not be considered for OxoG filtering", record.desc(), g2t_or_c2a_max_af, opt.af_either_pass)
+                        } else if !oxo.occurence_sufficient() {
+                            debug!("Record {} has insufficient count", record.desc());
+                            let insufficient_filter =
+                                wrt.header().name_to_id(INSUFFICIENT_FILTER)?;
+                            record.push_filter(insufficient_filter);
                         } else {
-                            if !oxo.occurence_sufficient() {
-                                debug!("Record {} has insufficient count", record.desc());
-                                let insufficient_filter =
-                                    wrt.header().name_to_id(INSUFFICIENT_FILTER)?;
-                                record.push_filter(insufficient_filter);
-                            } else {
-                                if !opt.skip_fishers {
-                                    debug!(
-                                        "Checking if record {} passes Fisher's OxoG filter...",
-                                        record.desc()
-                                    );
-                                    apply_fishers_filter(
-                                        &mut record,
-                                        opt.fishers_sig as f32,
-                                        opt.af_both_pass,
-                                    )?;
-                                }
-                                apply_af_too_low_filter(&mut record, AF_MIN)?;
+                            if !opt.skip_fishers {
+                                debug!(
+                                    "Checking if record {} passes Fisher's OxoG filter...",
+                                    record.desc()
+                                );
+                                apply_fishers_filter(
+                                    &mut record,
+                                    opt.fishers_sig as f32,
+                                    opt.af_both_pass,
+                                )?;
                             }
+                            apply_af_too_low_filter(&mut record, AF_MIN)?;
                         }
                     }
                 }
