@@ -51,7 +51,7 @@ All releases and associated binaries and archives are accessible under [Releases
 ```
 
 ```
-rustynuc 0.2.0
+rustynuc 0.3.0
 
 USAGE:
     rustynuc [FLAGS] [OPTIONS] <bam>
