@@ -7,12 +7,12 @@ use fishers_exact::fishers_exact;
 use log::debug;
 use rust_htslib::bam::pileup::Pileup;
 use std::collections::HashMap;
+use std::fmt;
 
 type Result<T> = std::result::Result<T, Error>;
 
 /// Contains summary of a pileup split into `first in pair` and `second in pair`.
 /// Contains helper functions for determining likelihood of reads containing oxo damage.
-#[derive(Debug)]
 pub struct OxoPileup {
     pub chrom: String,
     pub depth: u32,
@@ -24,6 +24,43 @@ pub struct OxoPileup {
     pub pseudocount: u32,
 }
 
+impl fmt::Debug for OxoPileup {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let ff_count = self.nuc_counts(Orientation::FF);
+        let fr_count = self.nuc_counts(Orientation::FR);
+
+        let nuc_counts = |counts: Vec<u32>| {
+            counts
+                .iter()
+                .zip(crate::NUCLEOTIDES.iter().map(|nuc| *nuc as char))
+                .map(|(count, nuc)| format!("{}:{}", nuc, count))
+                .collect::<Vec<String>>()
+        };
+
+        let s = format!(
+            r#"
+            {}
+            {}
+            {}
+            {:?}
+            {:?}
+            {:?}
+            {}
+            {}
+            "#,
+            self.chrom,
+            self.depth,
+            self.pos,
+            self.context,
+            nuc_counts(ff_count),
+            nuc_counts(fr_count),
+            self.min_count,
+            self.pseudocount
+        );
+
+        write!(f, "{}", s)
+    }
+}
 #[derive(Debug, Eq, PartialEq)]
 /// Contains nucleotide counts for a specific position
 pub struct NucleotideCount(pub HashMap<u8, u32>);
