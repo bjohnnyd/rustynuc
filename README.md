@@ -3,6 +3,7 @@
 [![install with bioconda][ico-bioconda]][link-bioconda]
 [![Release][ico-version]][link-version]
 [![Build Status][ico-travis]][link-travis]
+![RustyNuc Testing][ico-github]
 [![Software License][ico-license]](./LICENSE.md)
 
 
@@ -51,7 +52,7 @@ All releases and associated binaries and archives are accessible under [Releases
 ```
 
 ```
-rustynuc 0.2.0
+rustynuc 0.3.0
 
 USAGE:
     rustynuc [FLAGS] [OPTIONS] <bam>
@@ -180,6 +181,7 @@ If used in published research, a citation is appreciated:
 [ico-downloads]: https://img.shields.io/packagist/dt/:vendor/rustynuc.svg?style=flat-square
 [ico-bioconda]: https://img.shields.io/badge/install%20with-bioconda-brightgreen.svg?style=flat
 [ico-doi]: https://zenodo.org/badge/DOI/10.5281/zenodo.4157557.svg
+[ico-github]: https://github.com/bjohnnyd/rustynuc/workflows/RustyNuc%20Testing/badge.svg
 
 [link-version]: https://github.com/bjohnnyd/rustynuc/releases/latest
 [link-travis]: https://travis-ci.com/bjohnnyd/rustynuc
