@@ -5,7 +5,7 @@ use rust_htslib::bcf::Read as VcfRead;
 use rust_htslib::{bam, bam::Read, bcf};
 use std::{
     collections::{HashMap, HashSet},
-    path::PathBuf,
+    path::Path,
 };
 
 pub fn create_pileups(
@@ -51,7 +51,7 @@ pub fn create_regions<T: std::io::Read>(
     Ok(())
 }
 
-pub fn create_vcf_positions(path: &PathBuf) -> Result<HashSet<String>> {
+pub fn create_vcf_positions(path: &Path) -> Result<HashSet<String>> {
     info!("Reading VCF...");
     let mut vcf = bcf::Reader::from_path(path)?;
 
