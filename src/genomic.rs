@@ -1,10 +1,14 @@
 use crate::Result;
 use bio::utils::Interval;
-use log::error;
-use rust_htslib::{bam, bam::Read};
-use std::collections::HashMap;
+use log::{debug, error, info};
+use rust_htslib::bcf::Read as VcfRead;
+use rust_htslib::{bam, bam::Read, bcf};
+use std::{
+    collections::{HashMap, HashSet},
+    path::PathBuf,
+};
 
-pub fn create_pileups<'a>(
+pub fn create_pileups(
     bam: &mut bam::Reader,
     threads: usize,
     max_depth: u32,
@@ -45,6 +49,33 @@ pub fn create_regions<T: std::io::Read>(
         regions.push(interval);
     }
     Ok(())
+}
+
+pub fn create_vcf_positions(path: &PathBuf) -> Result<HashSet<String>> {
+    info!("Reading VCF...");
+    let mut vcf = bcf::Reader::from_path(path)?;
+
+    vcf.records()
+        .enumerate()
+        .fold(Ok(HashSet::new()), |vcf_positions, (i, record)| {
+            debug!("Accesing {} record in the VCF...", i + 1);
+            let record = record?;
+            let reference = record.alleles()[0];
+            let mut vcf_positions = vcf_positions?;
+            debug!(
+                "Succesfully obtained description {} with reference allele {}",
+                record.desc(),
+                String::from_utf8(reference.to_vec())?
+            );
+            if is_any_iupac_s(reference, 0, reference.len()) {
+                debug!(
+                    "Record {} in the VCF will be processed for potential 8-oxoG",
+                    record.desc()
+                );
+                vcf_positions.insert(record.desc());
+            }
+            Ok(vcf_positions)
+        })
 }
 
 /// Checks if nucleotide at specifc positions is IUPAC S

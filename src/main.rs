@@ -16,7 +16,9 @@ mod genomic;
 pub mod vcf;
 
 use crate::alignment::OxoPileup;
-use genomic::{create_fasta_records, create_pileups, create_regions, is_any_iupac_s};
+use genomic::{
+    create_fasta_records, create_pileups, create_regions, create_vcf_positions, is_any_iupac_s,
+};
 use log::{debug, error, info, warn};
 use rayon::prelude::*;
 use rust_htslib::{bam, bam::Read};
@@ -35,7 +37,7 @@ pub const NUCLEOTIDES: [u8; 4] = [b'A', b'C', b'G', b'T'];
 /// Default visualization settings for track line
 pub const TRACK_LINE: &str = "#coords 0";
 
-type Result<T> = std::result::Result<T, crate::error::Error>;
+type Result<T, E = crate::error::Error> = std::result::Result<T, E>;
 
 fn main() -> Result<()> {
     match main_try() {
@@ -94,25 +96,7 @@ fn main_try() -> Result<()> {
     }
 
     if let Some(ref path) = opt.bcf {
-        info!("Reading VCF...");
-        let mut vcf = bcf::Reader::from_path(path)?;
-        for (i, record) in vcf.records().enumerate() {
-            debug!("Accesing {} record in the VCF...", i + 1);
-            let record = record?;
-            let reference = record.alleles()[0];
-            debug!(
-                "Succesfully obtained description {} with reference allele {}",
-                record.desc(),
-                String::from_utf8(reference.to_vec())?
-            );
-            if is_any_iupac_s(reference, 0, reference.len()) {
-                debug!(
-                    "Record {} in the VCF will be processed for potential 8-oxoG",
-                    record.desc()
-                );
-                vcf_positions.insert(record.desc());
-            }
-        }
+        vcf_positions = create_vcf_positions(path)?;
     }
 
     info!("Started pileup analysis...");
@@ -270,12 +254,13 @@ fn main_try() -> Result<()> {
             .enumerate()
             .map_with(tx, |s, (rank, p)| {
                 let pval = p.pval()?;
-                let mut corrected = String::from("");
-                if calc_qval {
+                let corrected = if calc_qval {
                     let qval = (alpha * rank as f32) / m as f32;
                     let sig = if pval < qval as f64 { 1 } else { 0 };
-                    corrected = format!("{}\t{}", qval, sig);
-                }
+                    format!("{}\t{}", qval, sig)
+                } else {
+                    String::default()
+                };
                 s.send(format!("{}\t{}", p.to_bed_row()?, corrected))?;
                 Ok(())
             })
