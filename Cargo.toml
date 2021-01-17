@@ -1,6 +1,6 @@
 [package]
 name = "rustynuc"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Johnny Debebe johnny.debebe@nottingham.ac.uk"]
 edition = "2018"
 description = "Quick analysis of pileups for likely 8-oxoG locations"
@@ -37,6 +37,8 @@ predicates = "1.0.4"
 assert_cmd = "1.0.1"
 walkdir = "2.3.1"
 criterion = "0.3.3"
+regex = "1.4.2"
+lazy_static = "*"
 
 [[bench]]
 name = "benchmark"

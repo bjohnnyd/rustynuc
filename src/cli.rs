@@ -24,6 +24,12 @@ pub(crate) struct RustyNuc {
         default_value = "20"
     )]
     pub(crate) quality: u8,
+    #[structopt(
+        long,
+        help = "AF above this cutoff in EITHER read orientation will be excluded from OxoAF filter",
+        default_value = "0.25"
+    )]
+    pub(crate) af_either_pass: f32,
     #[structopt(long, help = "Maximum pileup depth to use", default_value = "1000")]
     pub(crate) max_depth: u32,
     #[structopt(
@@ -31,9 +37,15 @@ pub(crate) struct RustyNuc {
         help = "Significance threshold for Fisher's test",
         default_value = "0.05"
     )]
-    pub(crate) fisher_sig: f64,
+    pub(crate) fishers_sig: f64,
     #[structopt(long, help = "FDR threshold", default_value = "0.2")]
     pub(crate) alpha: f32,
+    #[structopt(
+        long,
+        help = "AF on both the ff and fr at which point a call in the VCF will excluded from the OxoAF filter",
+        default_value = "0.1"
+    )]
+    pub(crate) af_both_pass: f32,
     #[structopt(
         short,
         long,
@@ -46,6 +58,8 @@ pub(crate) struct RustyNuc {
         help = "Whether to process and print information for every position in the BAM file"
     )]
     pub(crate) all: bool,
+    #[structopt(long, help = "Skip applying Fisher's Exact Filter on VCF")]
+    pub(crate) skip_fishers: bool,
     #[structopt(
         help = "Alignments to investigate for possible 8-oxoG damage",
         required = true,
@@ -74,6 +88,11 @@ pub(crate) struct RustyNuc {
         help = "BCF/VCF for variants called on the supplied alignment file"
     )]
     pub(crate) bcf: Option<PathBuf>,
+    #[structopt(
+        long,
+        help = "Do not count overlapping mates when calculating total depth"
+    )]
+    pub(crate) no_overlapping: bool,
 }
 
 impl RustyNuc {
