@@ -3,7 +3,7 @@
 [![install with bioconda][ico-bioconda]][link-bioconda]
 [![Release][ico-version]][link-version]
 [![Build Status][ico-travis]][link-travis]
-[Testing, Linting and MSRV][ico-github]
+![Testing, Linting and MSRV][ico-github]
 [![Software License][ico-license]](./LICENSE.md)
 
 
