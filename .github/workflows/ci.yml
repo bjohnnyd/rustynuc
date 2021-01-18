@@ -1,6 +1,6 @@
 on: push
 
-name: RustyNuc Testing
+name: Testing, Linting and MSRV
 
 jobs:
   ci:
