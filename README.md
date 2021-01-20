@@ -30,10 +30,19 @@ Precompiled binaries are provided below:
 
 ### Cargo
 
-If you have cargo installed or have installed [RUSTUP](https://rustup.rs/), you can install directly from github
+If you have cargo installed or have installed [RUSTUP](https://rustup.rs/), you can install directly from: 
+
+-  Crates.io
+``` bash
+cargo install rustynuc
+```
+
+- Github
+
 ``` bash
 cargo install --git https://github.com/bjohnnyd/rustynuc
 ```
+
 
 ### Build
 
