@@ -8,3 +8,6 @@
 /.README.template
 /themes
 /public
+/sass
+/content
+/templates
