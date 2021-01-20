@@ -199,8 +199,8 @@ If used in published research, a citation is appreciated:
 [link-bioconda]: http://bioconda.github.io/recipes/rustynuc/README.html
 [link-doi]: https://doi.org/10.5281/zenodo.4157557
 
-[linux-tar]: https://github.com/bjohnnyd/rustynuc/releases/latest/download/x86_64-unknown-linux-gnu.tar.gz
-[linux-zip]: https://github.com/bjohnnyd/rustynuc/releases/latest/download/x86_64-unknown-linux-gnu.zip
+[linux-tar]: https://github.com/bjohnnyd/rustynuc/releases/latest/download/x86_64-unknown-linux-musl.tar.gz
+[linux-zip]: https://github.com/bjohnnyd/rustynuc/releases/latest/download/x86_64-unknown-linux-musl.zip
 [osx-tar]: https://github.com/bjohnnyd/rustynuc/releases/latest/download/x86_64-apple-darwin.tar.gz
 [osx-zip]: https://github.com/bjohnnyd/rustynuc/releases/latest/download/x86_64-apple-darwin.zip
 [windows-tar]: https://github.com/bjohnnyd/rustynuc/releases/latest/download/x86_64-pc-windows-gnu.tar.gz
