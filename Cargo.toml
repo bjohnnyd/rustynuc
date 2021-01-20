@@ -38,7 +38,7 @@ assert_cmd = "1.0.1"
 walkdir = "2.3.1"
 criterion = "0.3.3"
 regex = "1.4.2"
-lazy_static = "*"
+lazy_static = "1.4.0"
 
 [[bench]]
 name = "benchmark"
