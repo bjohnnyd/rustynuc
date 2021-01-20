@@ -189,7 +189,7 @@ If used in published research, a citation is appreciated:
 [ico-travis]: https://img.shields.io/travis/com/bjohnnyd/rustynuc?style=flat-square
 [ico-downloads]: https://img.shields.io/packagist/dt/:vendor/rustynuc.svg?style=flat-square
 [ico-bioconda]: https://img.shields.io/badge/install%20with-bioconda-brightgreen.svg?style=flat
-[ico-doi]: https://zenodo.org/badge/DOI/10.5281/zenodo.4157557.svg
+[ico-doi]: https://zenodo.org/badge/265680729.svg
 [ico-github]: https://github.com/bjohnnyd/rustynuc/workflows/Testing,%20Linting%20and%20MSRV/badge.svg
 
 [link-version]: https://github.com/bjohnnyd/rustynuc/releases/latest
@@ -197,7 +197,7 @@ If used in published research, a citation is appreciated:
 [link-downloads]: https://packagist.org/packages/bjohnnyd/rustynuc
 [link-author]: https://github.com/bjohnnyd
 [link-bioconda]: http://bioconda.github.io/recipes/rustynuc/README.html
-[link-doi]: https://doi.org/10.5281/zenodo.4157557
+[link-doi]: https://zenodo.org/badge/latestdoi/265680729
 
 [linux-tar]: https://github.com/bjohnnyd/rustynuc/releases/latest/download/x86_64-unknown-linux-musl.tar.gz
 [linux-zip]: https://github.com/bjohnnyd/rustynuc/releases/latest/download/x86_64-unknown-linux-musl.zip
