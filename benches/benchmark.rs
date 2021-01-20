@@ -1,4 +1,4 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{criterion_group, criterion_main, Criterion};
 use log::error;
 
 fn is_s(seq: &[u8], pos: usize) -> bool {

@@ -15,8 +15,8 @@ fn extract_filters(output: &[u8]) -> Vec<String> {
     String::from_utf8(output.to_vec())
         .unwrap()
         .lines()
-        .filter(|l| !l.starts_with("#"))
-        .flat_map(|l| l.split("\t").skip(6).next())
+        .filter(|l| !l.starts_with('#'))
+        .flat_map(|l| l.split('\t').nth(6))
         .map(String::from)
         .collect()
 }

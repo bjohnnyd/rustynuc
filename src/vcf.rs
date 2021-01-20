@@ -209,7 +209,7 @@ mod tests {
 
     pub fn get_record_at(path: &str, idx: usize) -> bcf::Record {
         let mut vcf = bcf::Reader::from_path(path).unwrap();
-        vcf.records().skip(idx).next().unwrap().unwrap()
+        vcf.records().nth(idx).unwrap().unwrap()
     }
     fn test_get_frequencies_for_g2t_or_c2a() {
         let mut record = get_record_at(
