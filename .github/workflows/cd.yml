@@ -1,0 +1,44 @@
+on:
+  push:
+    # Sequence of patterns matched against refs/tags
+    tags:
+    - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
+
+env:
+  CARGO_TARGET_DIR: binary
+
+name: Upload Release Asset
+jobs:
+  build_binaries:
+    name: Create Binaries
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        build: [ubuntu, macos]
+        include:
+          - build: macos
+            os: macos-latest
+            rust: stable
+          - build: ubuntu
+            os: ubuntu-latest
+            rust: stable
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ matrix.rust }}
+          override: true
+
+      - name: Run cargo build
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@master
+        with:
+          name: binary-artifact-${{ matrix.os }}
+          path: binary/release/rustynuc

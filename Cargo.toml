@@ -1,6 +1,6 @@
 [package]
 name = "rustynuc"
-version = "0.3.0"
+version = "0.3.1"
 authors = ["Johnny Debebe johnny.debebe@nottingham.ac.uk"]
 edition = "2018"
 description = "Quick analysis of pileups for likely 8-oxoG locations"
@@ -17,7 +17,7 @@ default-features = false
 features = ["gz"]
 
 [dependencies.rust-htslib]
-version = "0.31.0"
+version = "0.35.*"
 default-features = false 
 
 [dependencies.env_logger]
@@ -37,7 +37,7 @@ predicates = "1.0.4"
 assert_cmd = "1.0.1"
 walkdir = "2.3.1"
 criterion = "0.3.3"
-regex = "1.4.2"
+regex = "1.5.5"
 lazy_static = "*"
 
 [[bench]]

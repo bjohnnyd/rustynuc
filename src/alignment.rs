@@ -8,6 +8,7 @@ use log::debug;
 use rust_htslib::bam::pileup::Pileup;
 use std::collections::HashMap;
 use std::fmt;
+use std::fmt::Write as _;
 
 type Result<T> = std::result::Result<T, Error>;
 
@@ -79,10 +80,7 @@ impl OxoPileup {
         let mut depth = 0;
         let pos = pileup.pos();
         let pseudocount = if pseudocount { 1 } else { 0 };
-        let context = match seq {
-            Some(seq) => Some(get_seq_context(seq.as_ref(), pos)),
-            None => None,
-        };
+        let context = seq.map(|seq| get_seq_context(seq.as_ref(), pos));
 
         let mut ff_count = [0; 256];
         let mut fr_count = [0; 256];
@@ -240,16 +238,18 @@ impl OxoPileup {
             .iter()
             .zip(self.nuc_counts(Orientation::FR))
             .fold(
-                format!("{}", self.depth),
-                |mut summary, (ff_count, fr_count)| {
-                    summary.push_str(&format!(
+                Ok(format!("{}", self.depth)),
+                |summary: std::result::Result<String, std::fmt::Error>, (ff_count, fr_count)| {
+                    let mut summary = summary?;
+                    write!(
+                        summary,
                         "\t{}:{}",
                         ff_count - self.pseudocount,
                         fr_count - self.pseudocount,
-                    ));
-                    summary
+                    )?;
+                    Ok(summary)
                 },
-            );
+            )?;
 
         Ok(format!(
             "{}\t{}\t{}",

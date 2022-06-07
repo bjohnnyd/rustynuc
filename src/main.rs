@@ -9,6 +9,7 @@
 //! QC tool for assesment of likelihood of 8-oxoG related variation.
 mod alignment;
 mod cli;
+#[allow(clippy::enum_variant_names)]
 mod error;
 mod genomic;
 
@@ -164,7 +165,7 @@ fn main_try() -> Result<()> {
         let mut vcf = bcf::Reader::from_path(path)?;
 
         let header = HEADER_RECORDS.iter().fold(
-            bcf::header::Header::from_template(&vcf.header()),
+            bcf::header::Header::from_template(vcf.header()),
             |mut header, header_record| {
                 header.push_record(header_record);
                 header
@@ -198,7 +199,7 @@ fn main_try() -> Result<()> {
                         && oxo.nuc_sufficient(ref_allele).iter().all(|x| *x) =>
                 {
                     debug!("Updating VCF information for {}", record.desc());
-                    if let Some(g2t_or_c2a_max_af) = update_vcf_record(&mut record, &oxo)? {
+                    if let Some(g2t_or_c2a_max_af) = update_vcf_record(&mut record, oxo)? {
                         if g2t_or_c2a_max_af > opt.af_either_pass {
                             debug!("Record {} has a max orientation AF of {} which is above the frequency of {} and will not be considered for OxoG filtering", record.desc(), g2t_or_c2a_max_af, opt.af_either_pass)
                         } else if !oxo.occurence_sufficient() {
