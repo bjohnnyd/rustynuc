@@ -61,7 +61,7 @@ All releases and associated binaries and archives are accessible under [Releases
 ```
 
 ```
-rustynuc 0.3.0
+rustynuc 0.3.1
 
 USAGE:
     rustynuc [FLAGS] [OPTIONS] <bam>
@@ -124,7 +124,7 @@ The default output (if no `--bcf/-b` is provided) is a BED file with the followi
 To get only positions with p-value below 0.05:
 
 ```bash
-rustynuc -r tests/input/ref.fa.gz tests/alignments/oxog.bam | awk '$12 < 0.05 || $13 < 0.05'  | gzip > sig.bed.gz
+rustynuc -r tests/input/ref.fa.gz tests/input/oxog.bam | awk '$12 < 0.05 || $13 < 0.05'  | gzip > sig.bed.gz
 ```
 
 If a VCF/BCF is provided the output will be in VCF format.  Multiple summaries are provided in the VCF file:
@@ -150,7 +150,7 @@ For each alternate allele, there are two AF provided so for example to filter th
 
 ```bash
 FILTERCMD='TYPE =="snp" && AF > 0.04 && FILTER=="PASS" && (FF_FR_AF=="." || (FF_FR_AF[0] >= 0.04 && FF_FR_AF[1] >= 0.04))'
-rustynuc --pseudocounts -r tests/input/ref.fa.gz --b tests/input/oxog.vcf.gz tests/alignments/oxog.bam | bcftools filter -Oz -i "$FILTERCMD" > nonoxog.vcf.gz
+rustynuc --pseudocount -r tests/input/ref.fa.gz -b tests/input/oxog.vcf.onlysnp.gz tests/input/oxog.bam | bcftools filter -Oz -i "$FILTERCMD" > nonoxog.vcf.gz
 ```
 
 ## Authors
