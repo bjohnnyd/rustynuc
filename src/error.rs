@@ -11,9 +11,9 @@ pub enum Error {
     #[error("Could not convert bytes in FASTA as it is invalid UTF-8")]
     /// Data is not in UTF-8 format
     NotUTF8(#[from] std::string::FromUtf8Error),
-    #[error("Could not read/process the BAM file")]
-    /// Bam Reading Error
-    BamError(#[from] rust_htslib::bam::Error),
+    #[error("Could not read/process the BAM/VCF/VCF file")]
+    /// Bam or VCF reading or writing error
+    BamVcfError(#[from] rust_htslib::errors::Error),
     #[error("Count too large for statistical testing")]
     /// Fisher's exact error
     FishersError(#[from] fishers_exact::TooLargeValueError),
@@ -32,9 +32,6 @@ pub enum Error {
     #[error("Incorrect interval in BED entry on line {0}, end {1} is smaller than start {2} ")]
     /// Incorect nucleotide supplied
     IncorrectInterval(usize, u64, u64),
-    #[error("Could not read VCF/BCF file")]
-    /// Read VCF/BCF Error
-    CouldNotReadVcf(#[from] rust_htslib::bcf::Error),
     #[error("Missing Tag `{0}` in infot field of VCF Record")]
     /// Query INFO field tag Error
     NoInfoTag(String),
@@ -44,4 +41,7 @@ pub enum Error {
     #[error("Could not receive across threads")]
     /// Failed to send BED rows across threads
     ParallelWriterSend(#[from] SendError<String>),
+    #[error("Could not write to string.")]
+    /// Failed to write data to string
+    WriteToString(#[from] std::fmt::Error),
 }

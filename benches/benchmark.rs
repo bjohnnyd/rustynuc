@@ -6,10 +6,7 @@ fn is_s(seq: &[u8], pos: usize) -> bool {
         error!("Reference sequence is shorter than BAM alignment positions");
         std::process::exit(1)
     } else {
-        match seq[pos] {
-            b'G' | b'C' | b'g' | b'c' => true,
-            _ => false,
-        }
+        matches!(seq[pos], b'G' | b'C' | b'g' | b'c')
     }
 }
 

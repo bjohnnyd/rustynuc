@@ -53,22 +53,10 @@ pub fn update_vcf_record(record: &mut bcf::Record, oxo: &OxoPileup) -> Result<Op
         .collect::<HashMap<u8, [i32; 2]>>();
 
     record.push_info_integer(b"OXO_DEPTH", &[oxo.depth as i32])?;
-    record.push_info_integer(
-        b"ADENINE_FF_FR",
-        counts.get(&b'A').unwrap_or_else(|| &[0, 0]),
-    )?;
-    record.push_info_integer(
-        b"CYTOSINE_FF_FR",
-        counts.get(&b'C').unwrap_or_else(|| &[0, 0]),
-    )?;
-    record.push_info_integer(
-        b"GUANINE_FF_FR",
-        counts.get(&b'G').unwrap_or_else(|| &[0, 0]),
-    )?;
-    record.push_info_integer(
-        b"THYMINE_FF_FR",
-        counts.get(&b'T').unwrap_or_else(|| &[0, 0]),
-    )?;
+    record.push_info_integer(b"ADENINE_FF_FR", counts.get(&b'A').unwrap_or(&[0, 0]))?;
+    record.push_info_integer(b"CYTOSINE_FF_FR", counts.get(&b'C').unwrap_or(&[0, 0]))?;
+    record.push_info_integer(b"GUANINE_FF_FR", counts.get(&b'G').unwrap_or(&[0, 0]))?;
+    record.push_info_integer(b"THYMINE_FF_FR", counts.get(&b'T').unwrap_or(&[0, 0]))?;
 
     let ac_pval = oxo.get_nuc_pval(b'C')?;
     let gt_pval = oxo.get_nuc_pval(b'G')?;
@@ -90,8 +78,8 @@ pub fn update_vcf_record(record: &mut bcf::Record, oxo: &OxoPileup) -> Result<Op
                     .into_iter()
                     .skip(1)
                     .fold(Vec::new(), |mut oxo_af, alt_allele| {
-                        let alt_counts = counts.get(&alt_allele[0]).unwrap_or_else(|| &[0, 0]);
-                        let ref_counts = counts.get(&ref_allele[0]).unwrap_or_else(|| &[0, 0]);
+                        let alt_counts = counts.get(&alt_allele[0]).unwrap_or(&[0, 0]);
+                        let ref_counts = counts.get(&ref_allele[0]).unwrap_or(&[0, 0]);
                         let ff_af =
                             alt_counts[0] as f32 / (ref_counts[0] as f32 + alt_counts[0] as f32);
                         let fr_af =
@@ -191,14 +179,14 @@ pub fn apply_af_too_low_filter(record: &mut bcf::Record, min_af: f32) -> Result<
 }
 
 trait InfoExt {
-    fn get_float_value<'a>(&'a mut self, tag: &'a str) -> Result<&'a [f32]>;
+    fn get_float_value<'a>(&'a mut self, tag: &'a str) -> Result<Vec<f32>>;
 }
 
 impl InfoExt for Record {
-    fn get_float_value<'a>(&'a mut self, tag: &'a str) -> Result<&'a [f32]> {
-        self.info(tag.as_bytes())
-            .float()?
-            .ok_or_else(|| Error::NoInfoTag(tag.to_string()))
+    fn get_float_value<'a>(&'a mut self, tag: &'a str) -> Result<Vec<f32>> {
+        let buffer = self.info(tag.as_bytes()).float()?;
+        let value = buffer.ok_or_else(|| Error::NoInfoTag(tag.to_string()))?;
+        Ok(value.to_vec())
     }
 }
 #[cfg(test)]
